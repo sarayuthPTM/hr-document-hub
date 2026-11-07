@@ -42,16 +42,19 @@ export default function AdminLoginModal({ isOpen, onClose, onLoginSuccess, curre
         </button>
 
         {/* Modal Icon & Header */}
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-teal-600 to-emerald-500 text-white flex items-center justify-center mb-3 shadow-md shadow-teal-500/20">
-          <KeyRound className="w-6 h-6" />
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-12 h-12 rounded-2xl bg-white shadow-md ring-1 ring-slate-200 dark:ring-slate-700 flex items-center justify-center p-1 flex-shrink-0">
+            <img src="/logo.png" alt="Logo" className="w-full h-full object-contain rounded-xl" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+              เข้าสู่ระบบผู้ดูแลระบบ (Admin)
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              KBS HR Docs • กลุ่มบริหารงานบุคคล
+            </p>
+          </div>
         </div>
-
-        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
-          เข้าสู่ระบบผู้ดูแลระบบ (Admin)
-        </h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-5">
-          กรอกรหัสผ่านเพื่อเข้าจัดการ เพิ่ม แก้ไข และลบเอกสารในระบบ
-        </p>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">

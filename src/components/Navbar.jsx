@@ -36,8 +36,12 @@ export default function Navbar({
           
           {/* Logo & Dynamic School Title */}
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-400 flex items-center justify-center text-white shadow-sm ring-1 ring-teal-500/30">
-              <FileText className="w-5 h-5 stroke-[2.2]" />
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl overflow-hidden bg-white shadow-sm ring-1 ring-slate-200 dark:ring-slate-700 flex items-center justify-center p-0.5 flex-shrink-0 transition-transform hover:scale-105">
+              <img 
+                src="/logo.png" 
+                alt="KBS HR Docs Logo" 
+                className="w-full h-full object-contain rounded-xl"
+              />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -45,7 +49,7 @@ export default function Navbar({
                   {appNameTh}
                 </span>
                 <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-100 text-teal-800 dark:bg-teal-950/70 dark:text-teal-300">
-                  {appNameEn}
+                  ระบบรวบรวมเอกสาร
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">

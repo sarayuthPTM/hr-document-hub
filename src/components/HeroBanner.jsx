@@ -65,28 +65,33 @@ export default function HeroBanner({
         <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           
           {/* Left: Title & Quick Stats */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 text-[11px] font-semibold border border-teal-400/30">
-                <Sparkles className="w-3 h-3 text-teal-300" />
-                {appNameEn}
-              </span>
-              <span className="text-slate-400 text-xs hidden sm:inline">
-                {schoolName}
-              </span>
+          <div className="flex-1 min-w-0 flex items-center gap-3.5">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white p-1 shadow-md ring-2 ring-teal-400/30 flex-shrink-0 flex items-center justify-center">
+              <img src="/logo.png" alt="Logo" className="w-full h-full object-contain rounded-xl" />
             </div>
-            
-            <h1 className="text-lg sm:text-xl md:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-              <span>{appNameTh}</span>
-            </h1>
-            
-            <div className="flex items-center gap-3 text-xs text-slate-300 mt-1">
-              <span>เอกสารทั้งหมด <strong>{stats.totalDocs}</strong> รายการ</span>
-              <span>•</span>
-              <span className="flex items-center gap-1 text-amber-300">
-                <Flame className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                <span>ดาวน์โหลด <strong>{stats.totalDownloads.toLocaleString()}</strong> ครั้ง</span>
-              </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 text-[11px] font-semibold border border-teal-400/30">
+                  <Sparkles className="w-3 h-3 text-teal-300" />
+                  ระบบรวบรวมเอกสารงานบุคคล
+                </span>
+                <span className="text-slate-400 text-xs hidden sm:inline">
+                  {schoolName}
+                </span>
+              </div>
+              
+              <h1 className="text-lg sm:text-xl md:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+                <span>{appNameTh}</span>
+              </h1>
+              
+              <div className="flex items-center gap-3 text-xs text-slate-300 mt-1">
+                <span>เอกสารทั้งหมด <strong>{stats.totalDocs}</strong> รายการ</span>
+                <span>•</span>
+                <span className="flex items-center gap-1 text-amber-300">
+                  <Flame className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                  <span>ดาวน์โหลด <strong>{stats.totalDownloads.toLocaleString()}</strong> ครั้ง</span>
+                </span>
+              </div>
             </div>
           </div>
 
