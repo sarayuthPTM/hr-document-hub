@@ -8,7 +8,9 @@ import {
   PlusCircle, 
   ChevronDown,
   SlidersHorizontal,
-  Bookmark
+  Bookmark,
+  BarChart3,
+  FolderOpen
 } from 'lucide-react';
 
 import { CONFIG, CATEGORIES, YEARS, TARGET_AUDIENCES } from './config/constants';
@@ -18,6 +20,7 @@ import Navbar from './components/Navbar';
 import HeroBanner from './components/HeroBanner';
 import DocumentGrid from './components/DocumentGrid';
 import DocumentTable from './components/DocumentTable';
+import AnalyticsDashboard from './components/AnalyticsDashboard';
 import PreviewModal from './components/PreviewModal';
 import QRCodeModal from './components/QRCodeModal';
 import AdminLoginModal from './components/AdminLoginModal';
@@ -31,6 +34,9 @@ export default function App() {
     const saved = localStorage.getItem(CONFIG.STORAGE_KEY_THEME);
     return saved ? saved === 'true' : false;
   });
+
+  // Navigation tab state ('documents' | 'analytics')
+  const [activeTab, setActiveTab] = useState('documents');
 
   // Auth state
   const [isAdmin, setIsAdmin] = useState(() => {
@@ -286,7 +292,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col transition-colors selection:bg-teal-500 selection:text-white">
       
-      {/* Navbar */}
+      {/* Navbar with Tab Switcher */}
       <Navbar
         darkMode={darkMode}
         setDarkMode={setDarkMode}
@@ -296,198 +302,214 @@ export default function App() {
         onOpenAdd={handleOpenAdd}
         onOpenSettings={() => setIsSettingsOpen(true)}
         isLive={isLive}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
       />
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-4">
         
-        {/* Sleek Compact Hero Banner & Search */}
-        <HeroBanner
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          selectedCategory={selectedCategory}
-          setSelectedCategory={setSelectedCategory}
-          stats={stats}
-          categoryCounts={categoryCounts}
-          favoritesCount={favorites.length}
-        />
+        {/* TAB 1: Documents Repository */}
+        {activeTab === 'documents' && (
+          <>
+            {/* Sleek Compact Hero Banner & Search */}
+            <HeroBanner
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              selectedCategory={selectedCategory}
+              setSelectedCategory={setSelectedCategory}
+              stats={stats}
+              categoryCounts={categoryCounts}
+              favoritesCount={favorites.length}
+            />
 
-        {/* Compact Toolbar & Filter Bar */}
-        <div className="mt-4 mb-2 bg-white dark:bg-slate-900 rounded-2xl p-2.5 sm:p-3 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-wrap items-center justify-between gap-2.5">
-          
-          {/* Left filters */}
-          <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            
-            {/* Year Dropdown */}
-            <div className="relative">
-              <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}
-                className="appearance-none pl-2.5 pr-7 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-medium cursor-pointer"
-              >
-                <option value="ทั้งหมด">ปี พ.ศ. (ทั้งหมด)</option>
-                {YEARS.filter(y => y !== 'ทั้งหมด').map(y => (
-                  <option key={y} value={y}>พ.ศ. {y}</option>
-                ))}
-              </select>
-              <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            {/* Compact Toolbar & Filter Bar */}
+            <div className="mt-4 mb-2 bg-white dark:bg-slate-900 rounded-2xl p-2.5 sm:p-3 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-wrap items-center justify-between gap-2.5">
+              
+              {/* Left filters */}
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                
+                {/* Year Dropdown */}
+                <div className="relative">
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(e.target.value)}
+                    className="appearance-none pl-2.5 pr-7 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-medium cursor-pointer"
+                  >
+                    <option value="ทั้งหมด">ปี พ.ศ. (ทั้งหมด)</option>
+                    {YEARS.filter(y => y !== 'ทั้งหมด').map(y => (
+                      <option key={y} value={y}>พ.ศ. {y}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+
+                {/* Target Audience Dropdown */}
+                <div className="relative">
+                  <select
+                    value={selectedAudience}
+                    onChange={(e) => setSelectedAudience(e.target.value)}
+                    className="appearance-none pl-2.5 pr-7 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-medium cursor-pointer"
+                  >
+                    <option value="ทั้งหมด">กลุ่มเป้าหมาย (ทั้งหมด)</option>
+                    {TARGET_AUDIENCES.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+
+                {/* File Type Dropdown */}
+                <div className="relative">
+                  <select
+                    value={selectedFileType}
+                    onChange={(e) => setSelectedFileType(e.target.value)}
+                    className="appearance-none pl-2.5 pr-7 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-medium cursor-pointer"
+                  >
+                    <option value="ทั้งหมด">ประเภทไฟล์ (ทั้งหมด)</option>
+                    <option value="PDF">PDF</option>
+                    <option value="DOCX">Word (DOCX)</option>
+                    <option value="XLSX">Excel (XLSX)</option>
+                    <option value="PPTX">PowerPoint (PPTX)</option>
+                    <option value="ZIP">ZIP</option>
+                  </select>
+                  <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+
+                {/* Reset Filters */}
+                {(selectedCategory !== 'ทั้งหมด' || selectedYear !== 'ทั้งหมด' || selectedAudience !== 'ทั้งหมด' || selectedFileType !== 'ทั้งหมด' || searchQuery) && (
+                  <button
+                    onClick={() => {
+                      setSelectedCategory('ทั้งหมด');
+                      setSelectedYear('ทั้งหมด');
+                      setSelectedAudience('ทั้งหมด');
+                      setSelectedFileType('ทั้งหมด');
+                      setSearchQuery('');
+                    }}
+                    className="text-[11px] text-rose-500 hover:text-rose-600 font-semibold px-1.5 py-1 hover:underline"
+                  >
+                    ล้างตัวกรอง
+                  </button>
+                )}
+
+              </div>
+
+              {/* Right controls: Sort, Refresh, View Mode */}
+              <div className="flex items-center gap-1.5">
+                
+                {/* Sort Dropdown */}
+                <div className="relative">
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="appearance-none pl-2.5 pr-7 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-medium cursor-pointer"
+                  >
+                    <option value="pinned">แนะนำ / ปักหมุด</option>
+                    <option value="newest">เอกสารล่าสุด</option>
+                    <option value="downloads">ยอดดาวน์โหลดสูงสุด</option>
+                    <option value="title">ชื่อ ก-ฮ</option>
+                  </select>
+                  <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+
+                {/* Refresh Button */}
+                <button
+                  onClick={loadDocs}
+                  disabled={isLoading}
+                  className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors"
+                  title="รีเฟรชข้อมูล"
+                >
+                  <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-teal-600' : ''}`} />
+                </button>
+
+                {/* View Mode Toggle: Slider vs Grid vs Table */}
+                <div className="flex items-center p-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                  <button
+                    onClick={() => setViewMode('slider')}
+                    className={`px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition-colors ${
+                      viewMode === 'slider'
+                        ? 'bg-white dark:bg-slate-700 text-teal-600 dark:text-teal-400 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                    title="มุมมองสไลด์ลากเมาส์"
+                  >
+                    <SlidersHorizontal className="w-3 h-3" />
+                    <span className="hidden sm:inline">สไลด์</span>
+                  </button>
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={`px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition-colors ${
+                      viewMode === 'grid'
+                        ? 'bg-white dark:bg-slate-700 text-teal-600 dark:text-teal-400 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                    title="มุมมองการ์ดกะทัดรัด"
+                  >
+                    <LayoutGrid className="w-3 h-3" />
+                    <span className="hidden sm:inline">การ์ด</span>
+                  </button>
+                  <button
+                    onClick={() => setViewMode('table')}
+                    className={`px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition-colors ${
+                      viewMode === 'table'
+                        ? 'bg-white dark:bg-slate-700 text-teal-600 dark:text-teal-400 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                    title="มุมมองตาราง"
+                  >
+                    <List className="w-3 h-3" />
+                    <span className="hidden sm:inline">ตาราง</span>
+                  </button>
+                </div>
+
+              </div>
+
             </div>
 
-            {/* Target Audience Dropdown */}
-            <div className="relative">
-              <select
-                value={selectedAudience}
-                onChange={(e) => setSelectedAudience(e.target.value)}
-                className="appearance-none pl-2.5 pr-7 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-medium cursor-pointer"
-              >
-                <option value="ทั้งหมด">กลุ่มเป้าหมาย (ทั้งหมด)</option>
-                {TARGET_AUDIENCES.map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-              <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-
-            {/* File Type Dropdown */}
-            <div className="relative">
-              <select
-                value={selectedFileType}
-                onChange={(e) => setSelectedFileType(e.target.value)}
-                className="appearance-none pl-2.5 pr-7 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-medium cursor-pointer"
-              >
-                <option value="ทั้งหมด">ประเภทไฟล์ (ทั้งหมด)</option>
-                <option value="PDF">PDF</option>
-                <option value="DOCX">Word (DOCX)</option>
-                <option value="XLSX">Excel (XLSX)</option>
-                <option value="PPTX">PowerPoint (PPTX)</option>
-                <option value="ZIP">ZIP</option>
-              </select>
-              <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-
-            {/* Reset Filters */}
-            {(selectedCategory !== 'ทั้งหมด' || selectedYear !== 'ทั้งหมด' || selectedAudience !== 'ทั้งหมด' || selectedFileType !== 'ทั้งหมด' || searchQuery) && (
-              <button
-                onClick={() => {
-                  setSelectedCategory('ทั้งหมด');
-                  setSelectedYear('ทั้งหมด');
-                  setSelectedAudience('ทั้งหมด');
-                  setSelectedFileType('ทั้งหมด');
-                  setSearchQuery('');
-                }}
-                className="text-[11px] text-rose-500 hover:text-rose-600 font-semibold px-1.5 py-1 hover:underline"
-              >
-                ล้างตัวกรอง
-              </button>
+            {/* Document Presentation */}
+            {viewMode === 'table' ? (
+              <DocumentTable
+                documents={filteredDocuments}
+                isAdmin={isAdmin}
+                onPreview={handlePreview}
+                onDownload={handleDownload}
+                onOpenQR={(doc) => setQrDoc(doc)}
+                onCopyLink={handleCopyLink}
+                onEdit={handleOpenEdit}
+                onDelete={handleDeleteDoc}
+                onTogglePin={handleTogglePin}
+              />
+            ) : (
+              <DocumentGrid
+                documents={filteredDocuments}
+                isAdmin={isAdmin}
+                onPreview={handlePreview}
+                onDownload={handleDownload}
+                onOpenQR={(doc) => setQrDoc(doc)}
+                onCopyLink={handleCopyLink}
+                onEdit={handleOpenEdit}
+                onDelete={handleDeleteDoc}
+                onTogglePin={handleTogglePin}
+                favorites={favorites}
+                onToggleFavorite={handleToggleFavorite}
+                layoutMode={viewMode}
+              />
             )}
+          </>
+        )}
 
-          </div>
-
-          {/* Right controls: Sort, Refresh, View Mode */}
-          <div className="flex items-center gap-1.5">
-            
-            {/* Sort Dropdown */}
-            <div className="relative">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="appearance-none pl-2.5 pr-7 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-medium cursor-pointer"
-              >
-                <option value="pinned">แนะนำ / ปักหมุด</option>
-                <option value="newest">เอกสารล่าสุด</option>
-                <option value="downloads">ยอดดาวน์โหลดสูงสุด</option>
-                <option value="title">ชื่อ ก-ฮ</option>
-              </select>
-              <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-
-            {/* Refresh Button */}
-            <button
-              onClick={loadDocs}
-              disabled={isLoading}
-              className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors"
-              title="รีเฟรชข้อมูล"
-            >
-              <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-teal-600' : ''}`} />
-            </button>
-
-            {/* View Mode Toggle: Slider vs Grid vs Table */}
-            <div className="flex items-center p-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-              <button
-                onClick={() => setViewMode('slider')}
-                className={`px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition-colors ${
-                  viewMode === 'slider'
-                    ? 'bg-white dark:bg-slate-700 text-teal-600 dark:text-teal-400 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-                title="มุมมองสไลด์ลากเมาส์"
-              >
-                <SlidersHorizontal className="w-3 h-3" />
-                <span className="hidden sm:inline">สไลด์</span>
-              </button>
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition-colors ${
-                  viewMode === 'grid'
-                    ? 'bg-white dark:bg-slate-700 text-teal-600 dark:text-teal-400 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-                title="มุมมองการ์ดกะทัดรัด"
-              >
-                <LayoutGrid className="w-3 h-3" />
-                <span className="hidden sm:inline">การ์ด</span>
-              </button>
-              <button
-                onClick={() => setViewMode('table')}
-                className={`px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition-colors ${
-                  viewMode === 'table'
-                    ? 'bg-white dark:bg-slate-700 text-teal-600 dark:text-teal-400 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-                title="มุมมองตาราง"
-              >
-                <List className="w-3 h-3" />
-                <span className="hidden sm:inline">ตาราง</span>
-              </button>
-            </div>
-
-          </div>
-
-        </div>
-
-        {/* Document Presentation */}
-        {viewMode === 'table' ? (
-          <DocumentTable
-            documents={filteredDocuments}
-            isAdmin={isAdmin}
+        {/* TAB 2: Dashboard Analytics */}
+        {activeTab === 'analytics' && (
+          <AnalyticsDashboard
+            documents={documents}
             onPreview={handlePreview}
             onDownload={handleDownload}
-            onOpenQR={(doc) => setQrDoc(doc)}
-            onCopyLink={handleCopyLink}
-            onEdit={handleOpenEdit}
-            onDelete={handleDeleteDoc}
-            onTogglePin={handleTogglePin}
-          />
-        ) : (
-          <DocumentGrid
-            documents={filteredDocuments}
-            isAdmin={isAdmin}
-            onPreview={handlePreview}
-            onDownload={handleDownload}
-            onOpenQR={(doc) => setQrDoc(doc)}
-            onCopyLink={handleCopyLink}
-            onEdit={handleOpenEdit}
-            onDelete={handleDeleteDoc}
-            onTogglePin={handleTogglePin}
-            favorites={favorites}
-            onToggleFavorite={handleToggleFavorite}
-            layoutMode={viewMode}
           />
         )}
 
       </main>
 
-      {/* Clean Footer (No public Drive or Sheet URLs) */}
+      {/* Clean Footer */}
       <footer className="mt-auto border-t border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md py-5 transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-slate-500 dark:text-slate-400 space-y-1">
           <div className="flex flex-wrap items-center justify-center gap-2 text-slate-600 dark:text-slate-300 font-medium">

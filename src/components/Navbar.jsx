@@ -6,7 +6,9 @@ import {
   LogOut, 
   PlusCircle, 
   Settings, 
-  Lock
+  Lock,
+  BarChart3,
+  FolderOpen
 } from 'lucide-react';
 import { CONFIG } from '../config/constants';
 
@@ -18,7 +20,8 @@ export default function Navbar({
   onLogout, 
   onOpenAdd, 
   onOpenSettings,
-  isLive 
+  activeTab,
+  setActiveTab
 }) {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 dark:border-slate-800/80 glass-panel shadow-xs transition-colors">
@@ -45,8 +48,53 @@ export default function Navbar({
             </div>
           </div>
 
+          {/* Center Navigation Tabs: Documents vs Analytics */}
+          <div className="hidden md:flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+            <button
+              onClick={() => setActiveTab('documents')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'documents'
+                  ? 'bg-white dark:bg-slate-700 text-teal-600 dark:text-teal-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <FolderOpen className="w-3.5 h-3.5" />
+              <span>คลังเอกสาร & แบบฟอร์ม</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('analytics')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'analytics'
+                  ? 'bg-white dark:bg-slate-700 text-teal-600 dark:text-teal-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>สถิติเชิงลึก (Dashboard)</span>
+            </button>
+          </div>
+
           {/* Right actions */}
           <div className="flex items-center space-x-1.5 sm:space-x-2">
+
+            {/* Mobile Tab Switcher */}
+            <div className="flex md:hidden items-center p-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg">
+              <button
+                onClick={() => setActiveTab('documents')}
+                className={`p-1.5 rounded-md text-xs ${activeTab === 'documents' ? 'bg-white dark:bg-slate-700 text-teal-600' : 'text-slate-500'}`}
+                title="คลังเอกสาร"
+              >
+                <FolderOpen className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setActiveTab('analytics')}
+                className={`p-1.5 rounded-md text-xs ${activeTab === 'analytics' ? 'bg-white dark:bg-slate-700 text-teal-600' : 'text-slate-500'}`}
+                title="สถิติเชิงลึก"
+              >
+                <BarChart3 className="w-4 h-4" />
+              </button>
+            </div>
 
             {/* Dark Mode Toggle */}
             <button
@@ -65,7 +113,7 @@ export default function Navbar({
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white shadow-xs transition-all active:scale-95"
                 >
                   <PlusCircle className="w-3.5 h-3.5" />
-                  <span>เพิ่มเอกสาร</span>
+                  <span className="hidden sm:inline">เพิ่มเอกสาร</span>
                 </button>
 
                 <button
