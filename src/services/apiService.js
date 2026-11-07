@@ -17,7 +17,13 @@ class ApiService {
       gasUrl: CONFIG.DEFAULT_GAS_URL || '',
       sheetId: CONFIG.SHEET_ID,
       driveFolderId: CONFIG.DRIVE_FOLDER_ID,
-      adminPin: CONFIG.DEFAULT_PIN
+      adminPin: CONFIG.DEFAULT_PIN,
+      appNameTh: CONFIG.APP_NAME_TH,
+      appNameEn: CONFIG.APP_NAME,
+      schoolName: CONFIG.SCHOOL_NAME,
+      departmentName: CONFIG.DEPARTMENT_NAME,
+      developer: CONFIG.DEVELOPER_NAME,
+      tagline: CONFIG.TAGLINE
     };
   }
 

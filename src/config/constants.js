@@ -8,6 +8,8 @@ export const CONFIG = {
   APP_NAME_TH: 'ระบบรวบรวมเอกสารงานบุคคล',
   SCHOOL_NAME: 'โรงเรียนกาญจนาภิเษกวิทยาลัย กระบี่',
   DEPARTMENT_NAME: 'กลุ่มบริหารงานบุคคล',
+  DEVELOPER_NAME: 'พัฒนาโดย ว่าที่ ร.ต. ศรายุทธ พงค์ทองเมือง',
+  TAGLINE: 'พัฒนาระบบเพื่อการบริหารงานบุคคลที่มีประสิทธิภาพ',
   DEFAULT_PIN: '2725',
   
   // Google IDs provided by user

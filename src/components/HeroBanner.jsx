@@ -38,7 +38,8 @@ export default function HeroBanner({
   setSelectedCategory, 
   stats, 
   categoryCounts,
-  favoritesCount = 0
+  favoritesCount = 0,
+  settings = {}
 }) {
   const categoryScrollRef = useRef(null);
 
@@ -48,6 +49,10 @@ export default function HeroBanner({
       categoryScrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
     }
   };
+
+  const appNameTh = settings.appNameTh || CONFIG.APP_NAME_TH;
+  const appNameEn = settings.appNameEn || CONFIG.APP_NAME;
+  const schoolName = settings.schoolName || CONFIG.SCHOOL_NAME;
 
   return (
     <div className="pt-2 pb-2">
@@ -64,15 +69,15 @@ export default function HeroBanner({
             <div className="flex items-center gap-2 mb-1">
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 text-[11px] font-semibold border border-teal-400/30">
                 <Sparkles className="w-3 h-3 text-teal-300" />
-                HR Document Hub
+                {appNameEn}
               </span>
               <span className="text-slate-400 text-xs hidden sm:inline">
-                {CONFIG.SCHOOL_NAME}
+                {schoolName}
               </span>
             </div>
             
             <h1 className="text-lg sm:text-xl md:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-              <span>ศูนย์รวมเอกสาร & แบบฟอร์มงานบุคคล</span>
+              <span>{appNameTh}</span>
             </h1>
             
             <div className="flex items-center gap-3 text-xs text-slate-300 mt-1">
@@ -127,7 +132,7 @@ export default function HeroBanner({
           ref={categoryScrollRef}
           className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none scroll-smooth flex-1"
         >
-          {/* Favorites Filter Tab (New Feature) */}
+          {/* Favorites Filter Tab */}
           <button
             onClick={() => setSelectedCategory('favorites')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border ${

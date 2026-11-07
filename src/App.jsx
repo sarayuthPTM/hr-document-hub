@@ -117,7 +117,6 @@ export default function App() {
 
   // Reorder documents (Drag & Drop)
   const handleReorderDocs = (fromIndex, toIndex) => {
-    // Find the item in filteredDocuments or documents
     const docToMove = filteredDocuments[fromIndex];
     if (!docToMove) return;
 
@@ -231,7 +230,7 @@ export default function App() {
   const handleSaveSettings = (newSettings) => {
     const saved = apiService.saveSettings(newSettings);
     setSettings(saved);
-    showToast('บันทึกการตั้งค่าเรียบร้อยแล้ว', 'success');
+    showToast('บันทึกการตั้งค่าและข้อมูลระบบเรียบร้อยแล้ว', 'success');
     loadDocs();
   };
 
@@ -317,7 +316,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col transition-colors selection:bg-teal-500 selection:text-white">
       
-      {/* Navbar with Tab Switcher */}
+      {/* Navbar with Dynamic Titles & Tab Switcher */}
       <Navbar
         darkMode={darkMode}
         setDarkMode={setDarkMode}
@@ -329,6 +328,7 @@ export default function App() {
         isLive={isLive}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        settings={settings}
       />
 
       {/* Main Container */}
@@ -346,6 +346,7 @@ export default function App() {
               stats={stats}
               categoryCounts={categoryCounts}
               favoritesCount={favorites.length}
+              settings={settings}
             />
 
             {/* Compact Toolbar & Filter Bar */}
@@ -537,16 +538,19 @@ export default function App() {
 
       </main>
 
-      {/* Clean Footer */}
-      <footer className="mt-auto border-t border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md py-5 transition-colors">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-slate-500 dark:text-slate-400 space-y-1">
-          <div className="flex flex-wrap items-center justify-center gap-2 text-slate-600 dark:text-slate-300 font-medium">
-            <span>{CONFIG.SCHOOL_NAME}</span>
+      {/* Clean Footer with Developer Copyright & Dynamic Branding */}
+      <footer className="mt-auto border-t border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md py-6 transition-colors">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-slate-500 dark:text-slate-400 space-y-1.5">
+          <div className="flex flex-wrap items-center justify-center gap-2 text-slate-700 dark:text-slate-300 font-semibold text-xs sm:text-sm">
+            <span>{settings.schoolName || CONFIG.SCHOOL_NAME}</span>
             <span>•</span>
-            <span>{CONFIG.DEPARTMENT_NAME}</span>
+            <span>{settings.departmentName || CONFIG.DEPARTMENT_NAME}</span>
           </div>
-          <p className="text-[11px] text-slate-400">
-            © {new Date().getFullYear() + 543} {CONFIG.APP_NAME_TH} • พัฒนาระบบเพื่อการบริหารงานบุคคลที่มีประสิทธิภาพ
+          <p className="text-slate-600 dark:text-slate-400 font-medium">
+            © {new Date().getFullYear() + 543} {settings.appNameTh || CONFIG.APP_NAME_TH} • {settings.tagline || CONFIG.TAGLINE}
+          </p>
+          <p className="text-[11px] text-teal-600 dark:text-teal-400 font-semibold pt-0.5">
+            {settings.developer || CONFIG.DEVELOPER_NAME}
           </p>
         </div>
       </footer>

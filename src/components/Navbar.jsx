@@ -21,14 +21,20 @@ export default function Navbar({
   onOpenAdd, 
   onOpenSettings,
   activeTab,
-  setActiveTab
+  setActiveTab,
+  settings = {}
 }) {
+  const appNameTh = settings.appNameTh || CONFIG.APP_NAME_TH;
+  const appNameEn = settings.appNameEn || CONFIG.APP_NAME;
+  const schoolName = settings.schoolName || CONFIG.SCHOOL_NAME;
+  const departmentName = settings.departmentName || CONFIG.DEPARTMENT_NAME;
+
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 dark:border-slate-800/80 glass-panel shadow-xs transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           
-          {/* Logo & School Title */}
+          {/* Logo & Dynamic School Title */}
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-400 flex items-center justify-center text-white shadow-sm ring-1 ring-teal-500/30">
               <FileText className="w-5 h-5 stroke-[2.2]" />
@@ -36,14 +42,14 @@ export default function Navbar({
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-bold text-base sm:text-lg text-slate-900 dark:text-white tracking-tight">
-                  {CONFIG.APP_NAME_TH}
+                  {appNameTh}
                 </span>
                 <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-100 text-teal-800 dark:bg-teal-950/70 dark:text-teal-300">
-                  {CONFIG.APP_NAME}
+                  {appNameEn}
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                {CONFIG.DEPARTMENT_NAME} • {CONFIG.SCHOOL_NAME}
+                {departmentName} • {schoolName}
               </p>
             </div>
           </div>
@@ -119,7 +125,7 @@ export default function Navbar({
                 <button
                   onClick={onOpenSettings}
                   className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-slate-200 dark:border-slate-700"
-                  title="ตั้งค่าฐานข้อมูล & เชื่อมต่อระบบ"
+                  title="ตั้งค่าระบบ & ปรับแต่งข้อมูล"
                 >
                   <Settings className="w-4 h-4" />
                 </button>
