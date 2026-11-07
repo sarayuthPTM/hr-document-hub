@@ -44,8 +44,8 @@ function getOrCreateSettingsSheet(ss) {
     // Initial settings rows
     const initData = [
       ['adminPin', CONFIG.DEFAULT_PIN, 'รหัสผ่านเข้าสู่ระบบผู้ดูแลระบบ (Admin PIN)', new Date().toLocaleString('th-TH')],
-      ['appNameTh', 'KBS HR Hub', 'ชื่อระบบ (ภาษาไทย)', new Date().toLocaleString('th-TH')],
-      ['appNameEn', 'HR Document Hub', 'ชื่อระบบ (ภาษาอังกฤษ)', new Date().toLocaleString('th-TH')],
+      ['appNameTh', 'KBS HR Docs', 'ชื่อระบบ', new Date().toLocaleString('th-TH')],
+      ['appNameEn', 'KBS HR Docs', 'ชื่อระบบ (ย่อ / ภาษาอังกฤษ)', new Date().toLocaleString('th-TH')],
       ['schoolName', 'โรงเรียนกาญจนาภิเษกวิทยาลัย กระบี่', 'ชื่อสถานศึกษา', new Date().toLocaleString('th-TH')],
       ['departmentName', 'กลุ่มบริหารงานบุคคล', 'ชื่อกลุ่มงาน / ฝ่าย', new Date().toLocaleString('th-TH')],
       ['developer', 'พัฒนาโดย ว่าที่ ร.ต. ศรายุทธ พงค์ทองเมือง', 'ข้อมูลลิขสิทธิ์ / ผู้พัฒนา', new Date().toLocaleString('th-TH')],

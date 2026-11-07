@@ -157,7 +157,7 @@ export default function AdminSettingsModal({
                   type="text"
                   value={appNameTh}
                   onChange={(e) => setAppNameTh(e.target.value)}
-                  placeholder="ระบบรวบรวมเอกสารงานบุคคล"
+                  placeholder="KBS HR Docs"
                   className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500"
                 />
               </div>
@@ -170,7 +170,7 @@ export default function AdminSettingsModal({
                   type="text"
                   value={appNameEn}
                   onChange={(e) => setAppNameEn(e.target.value)}
-                  placeholder="HR Document Hub"
+                  placeholder="KBS HR Docs"
                   className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500"
                 />
               </div>

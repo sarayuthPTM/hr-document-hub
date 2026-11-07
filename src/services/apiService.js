@@ -9,7 +9,17 @@ class ApiService {
   loadSettings() {
     try {
       const saved = localStorage.getItem(CONFIG.STORAGE_KEY_SETTINGS);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // อัปเกรดชื่อระบบเป็น KBS HR Docs อัตโนมัติ
+        if (!parsed.appNameTh || parsed.appNameTh === 'ระบบรวบรวมเอกสารงานบุคคล') {
+          parsed.appNameTh = 'KBS HR Docs';
+        }
+        if (!parsed.appNameEn || parsed.appNameEn === 'HR Document Hub' || parsed.appNameEn === 'KBS HR Hub') {
+          parsed.appNameEn = 'KBS HR Docs';
+        }
+        return parsed;
+      }
     } catch (e) {
       console.error('Error loading settings:', e);
     }
@@ -18,8 +28,8 @@ class ApiService {
       sheetId: CONFIG.SHEET_ID,
       driveFolderId: CONFIG.DRIVE_FOLDER_ID,
       adminPin: CONFIG.DEFAULT_PIN,
-      appNameTh: CONFIG.APP_NAME_TH,
-      appNameEn: CONFIG.APP_NAME,
+      appNameTh: 'KBS HR Docs',
+      appNameEn: 'KBS HR Docs',
       schoolName: CONFIG.SCHOOL_NAME,
       departmentName: CONFIG.DEPARTMENT_NAME,
       developer: CONFIG.DEVELOPER_NAME,
