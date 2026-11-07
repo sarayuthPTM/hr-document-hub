@@ -14,7 +14,7 @@ class ApiService {
       console.error('Error loading settings:', e);
     }
     return {
-      gasUrl: '',
+      gasUrl: CONFIG.DEFAULT_GAS_URL || '',
       sheetId: CONFIG.SHEET_ID,
       driveFolderId: CONFIG.DRIVE_FOLDER_ID,
       adminPin: CONFIG.DEFAULT_PIN

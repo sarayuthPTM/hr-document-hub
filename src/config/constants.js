@@ -8,11 +8,14 @@ export const CONFIG = {
   APP_NAME_TH: 'ระบบรวบรวมเอกสารงานบุคคล',
   SCHOOL_NAME: 'โรงเรียนกาญจนาภิเษกวิทยาลัย กระบี่',
   DEPARTMENT_NAME: 'กลุ่มบริหารงานบุคคล',
-  DEFAULT_PIN: 'admin1234',
+  DEFAULT_PIN: '2725',
   
   // Google IDs provided by user
   SHEET_ID: '1i_1vctvE4Si6ylObH24ipOyTz2uSY6kXMKGNpd2N5WY',
   DRIVE_FOLDER_ID: '1mKdJUgQ9iEnVsJw-DeWV_NRnkAQsBsAt',
+  
+  // Live Google Apps Script Web App Endpoint
+  DEFAULT_GAS_URL: 'https://script.google.com/macros/s/AKfycbxCFCfQzF0WcRIHeVmFz2uA_Xg_wVAr5nxypUYnoU6zSI8n3FUvsjrf01vxXF_Zshgk/exec',
   
   SHEET_URL: 'https://docs.google.com/spreadsheets/d/1i_1vctvE4Si6ylObH24ipOyTz2uSY6kXMKGNpd2N5WY/edit?gid=0#gid=0',
   DRIVE_URL: 'https://drive.google.com/drive/folders/1mKdJUgQ9iEnVsJw-DeWV_NRnkAQsBsAt?usp=sharing',
@@ -183,52 +186,6 @@ export const INITIAL_DOCUMENTS = [
     status: 'active',
     createdAt: '18/01/2568 08:45',
     updatedAt: '18/01/2568 08:45',
-    uploadedBy: 'Admin'
-  },
-  {
-    id: 'DOC-2026-007',
-    title: 'ตารางสรุปสิทธิประโยชน์ สวัสดิการ และการเบิกจ่ายค่ารักษาพยาบาล/ค่าการศึกษาบุตร',
-    docNumber: 'สวด.01/2568',
-    category: 'ทะเบียนประวัติและสิทธิประโยชน์',
-    fileType: 'XLSX',
-    fileUrl: 'https://drive.google.com/drive/folders/1mKdJUgQ9iEnVsJw-DeWV_NRnkAQsBsAt?usp=sharing',
-    downloadUrl: 'https://drive.google.com/drive/folders/1mKdJUgQ9iEnVsJw-DeWV_NRnkAQsBsAt?usp=sharing',
-    previewUrl: 'https://drive.google.com/drive/folders/1mKdJUgQ9iEnVsJw-DeWV_NRnkAQsBsAt?usp=sharing',
-    driveFileId: '',
-    fileSize: '410 KB',
-    targetAudience: 'ข้าราชการครู',
-    academicYear: '2568',
-    tags: 'สวัสดิการ, เบิกค่ารักษา, ค่าการศึกษาบุตร, สิทธิประโยชน์',
-    description: 'ไฟล์ตาราง Excel สรุปสิทธิและอัตราการเบิกจ่ายเงินสวัสดิการข้าราชการตามระเบียบกรมบัญชีกลาง',
-    downloadCount: 115,
-    viewCount: 260,
-    isPinned: false,
-    status: 'active',
-    createdAt: '22/01/2568 13:00',
-    updatedAt: '22/01/2568 13:00',
-    uploadedBy: 'Admin'
-  },
-  {
-    id: 'DOC-2026-008',
-    title: 'แบบสัญญาจ้างลูกจ้างชั่วคราวและครูอัตราจ้าง (สัญญาจ้างมาตรฐาน สพฐ.)',
-    docNumber: 'สญ.05/2568',
-    category: 'สัญญาจ้างและบรรจุแต่งตั้ง',
-    fileType: 'DOCX',
-    fileUrl: 'https://drive.google.com/drive/folders/1mKdJUgQ9iEnVsJw-DeWV_NRnkAQsBsAt?usp=sharing',
-    downloadUrl: 'https://drive.google.com/drive/folders/1mKdJUgQ9iEnVsJw-DeWV_NRnkAQsBsAt?usp=sharing',
-    previewUrl: 'https://drive.google.com/drive/folders/1mKdJUgQ9iEnVsJw-DeWV_NRnkAQsBsAt?usp=sharing',
-    driveFileId: '',
-    fileSize: '530 KB',
-    targetAudience: 'ครูอัตราจ้าง / ลูกจ้างชั่วคราว',
-    academicYear: '2568',
-    tags: 'สัญญาจ้าง, ลูกจ้างชั่วคราว, ครูอัตราจ้าง, บรรจุแต่งตั้ง',
-    description: 'เอกสารแบบสัญญาจ้างลูกจ้างชั่วคราวรายเดือน งบประมาณสำนักงานคณะกรรมการการศึกษาขั้นพื้นฐาน',
-    downloadCount: 78,
-    viewCount: 195,
-    isPinned: false,
-    status: 'active',
-    createdAt: '25/01/2568 15:30',
-    updatedAt: '25/01/2568 15:30',
     uploadedBy: 'Admin'
   }
 ];
