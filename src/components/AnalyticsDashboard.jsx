@@ -287,46 +287,52 @@ export default function AnalyticsDashboard({ documents, onPreview, onDownload })
           </div>
 
           <div className="space-y-3.5">
-            {topDownloadedDocs.map((doc, idx) => {
-              const percentOfMax = ((doc.downloadCount || 0) / maxTopDocDownloads) * 100;
-              const medals = ['🥇', '🥈', '🥉', '4', '5'];
+            {topDownloadedDocs.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-xs">
+                ยังไม่มีข้อมูลการดาวน์โหลดแบบฟอร์ม
+              </div>
+            ) : (
+              topDownloadedDocs.map((doc, idx) => {
+                const percentOfMax = ((doc.downloadCount || 0) / maxTopDocDownloads) * 100;
+                const medals = ['🥇', '🥈', '🥉', '4', '5'];
 
-              return (
-                <div key={doc.id} className="group">
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <div className="flex items-center gap-2 truncate max-w-[75%]">
-                      <span className="font-bold text-sm w-5 text-center flex-shrink-0">
-                        {medals[idx]}
-                      </span>
-                      <span 
-                        onClick={() => onPreview(doc)}
-                        className="font-semibold text-slate-800 dark:text-slate-200 hover:text-teal-600 dark:hover:text-teal-400 cursor-pointer truncate transition-colors"
-                        title={doc.title}
-                      >
-                        {doc.title}
-                      </span>
-                      {doc.docNumber && (
-                        <span className="hidden sm:inline text-[10px] px-1.5 py-0.2 bg-slate-100 dark:bg-slate-800 rounded text-slate-500">
-                          {doc.docNumber}
+                return (
+                  <div key={doc.id} className="group">
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <div className="flex items-center gap-2 truncate max-w-[75%]">
+                        <span className="font-bold text-sm w-5 text-center flex-shrink-0">
+                          {medals[idx]}
                         </span>
-                      )}
+                        <span 
+                          onClick={() => onPreview(doc)}
+                          className="font-semibold text-slate-800 dark:text-slate-200 hover:text-teal-600 dark:hover:text-teal-400 cursor-pointer truncate transition-colors"
+                          title={doc.title}
+                        >
+                          {doc.title}
+                        </span>
+                        {doc.docNumber && (
+                          <span className="hidden sm:inline text-[10px] px-1.5 py-0.2 bg-slate-100 dark:bg-slate-800 rounded text-slate-500">
+                            {doc.docNumber}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 font-bold text-teal-600 dark:text-teal-400">
+                        <span>{doc.downloadCount || 0}</span>
+                        <span className="text-[10px] font-normal text-slate-400">โหลด</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 font-bold text-teal-600 dark:text-teal-400">
-                      <span>{doc.downloadCount || 0}</span>
-                      <span className="text-[10px] font-normal text-slate-400">โหลด</span>
-                    </div>
-                  </div>
 
-                  {/* Visual Bar */}
-                  <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full rounded-full bg-gradient-to-r from-teal-500 to-emerald-400 transition-all duration-500"
-                      style={{ width: `${percentOfMax}%` }}
-                    />
+                    {/* Visual Bar */}
+                    <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full rounded-full bg-gradient-to-r from-teal-500 to-emerald-400 transition-all duration-500"
+                        style={{ width: `${percentOfMax}%` }}
+                      />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
 
@@ -345,28 +351,34 @@ export default function AnalyticsDashboard({ documents, onPreview, onDownload })
           </div>
 
           <div className="space-y-3">
-            {categoryStats.slice(0, 6).map((cat) => {
-              const percent = Number(cat.percent);
-              return (
-                <div key={cat.name} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium text-slate-700 dark:text-slate-300 truncate max-w-[70%]">
-                      {cat.name}
-                    </span>
-                    <div className="flex items-center gap-2 text-slate-500 text-[11px]">
-                      <span><strong>{cat.downloads}</strong> โหลด</span>
-                      <span className="font-semibold text-indigo-600 dark:text-indigo-400">({cat.percent}%)</span>
+            {categoryStats.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-xs">
+                ยังไม่มีข้อมูลสถิติแยกตามหมวดหมู่
+              </div>
+            ) : (
+              categoryStats.slice(0, 6).map((cat) => {
+                const percent = Number(cat.percent);
+                return (
+                  <div key={cat.name} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-medium text-slate-700 dark:text-slate-300 truncate max-w-[70%]">
+                        {cat.name}
+                      </span>
+                      <div className="flex items-center gap-2 text-slate-500 text-[11px]">
+                        <span><strong>{cat.downloads}</strong> โหลด</span>
+                        <span className="font-semibold text-indigo-600 dark:text-indigo-400">({cat.percent}%)</span>
+                      </div>
+                    </div>
+                    <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-400 transition-all duration-500"
+                        style={{ width: `${percent}%` }}
+                      />
                     </div>
                   </div>
-                  <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-400 transition-all duration-500"
-                      style={{ width: `${percent}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
 

@@ -83,13 +83,13 @@ export default function AdminSettingsModal({
       setInitResult({ success: false, message: 'กรุณากรอก URL Web App ก่อนสั่งสร้างตาราง' });
       return;
     }
-    if (!window.confirm('คุณต้องการสั่งสร้างคอลัมน์และข้อมูลเริ่มต้นลงใน Google Sheet ใช่หรือไม่?')) return;
+    if (!window.confirm('คุณต้องการสั่งสร้างหัวตารางคอลัมน์ใน Google Sheet ใช่หรือไม่? (จะสร้างเฉพาะโครงสร้างคอลัมน์ ไม่ใส่ข้อมูลจำลอง)')) return;
 
     setIsInitializing(true);
     setInitResult(null);
     try {
       const res = await onInitSheet(gasUrl.trim());
-      setInitResult({ success: true, message: 'สร้างตารางและหัวข้อใน Google Sheet สำเร็จ!' });
+      setInitResult({ success: true, message: 'สร้างหัวตารางและโครงสร้างใน Google Sheet สำเร็จ!' });
     } catch (err) {
       setInitResult({ success: false, message: 'เกิดข้อผิดพลาด: ' + err.message });
     } finally {
@@ -291,10 +291,10 @@ export default function AdminSettingsModal({
                 onClick={handleInit}
                 disabled={isInitializing || !gasUrl}
                 className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800 transition-colors"
-                title="สร้างข้อมูลเริ่มต้นลงใน Google Sheet"
+                title="สร้างโครงสร้างหัวตารางคอลัมน์ใน Google Sheet"
               >
                 <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-                <span>{isInitializing ? 'กำลังสร้าง...' : 'สร้างตารางใน Sheet อัตโนมัติ'}</span>
+                <span>{isInitializing ? 'กำลังสร้าง...' : 'สร้างหัวตารางใน Sheet'}</span>
               </button>
 
               <button

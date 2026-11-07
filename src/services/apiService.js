@@ -1,9 +1,22 @@
 import * as XLSX from 'xlsx';
 import { CONFIG, INITIAL_DOCUMENTS } from '../config/constants';
 
+// Starter / Mock Document IDs to permanently exclude in production
+const MOCK_DOC_IDS = new Set([
+  'DOC-2026-001', 'DOC-2026-002', 'DOC-2026-003',
+  'DOC-2026-004', 'DOC-2026-005', 'DOC-2026-006',
+  'DOC-2026-007', 'DOC-2026-008'
+]);
+
 class ApiService {
   constructor() {
     this.settings = this.loadSettings();
+  }
+
+  // Filter out any mock/simulated documents
+  cleanDocsList(list) {
+    if (!Array.isArray(list)) return [];
+    return list.filter(d => d && !MOCK_DOC_IDS.has(d.id));
   }
 
   loadSettings() {
@@ -83,7 +96,8 @@ class ApiService {
             }
 
             if (Array.isArray(resJson.data)) {
-              const normalized = resJson.data.map(d => this.normalizeDoc(d));
+              const cleaned = this.cleanDocsList(resJson.data);
+              const normalized = cleaned.map(d => this.normalizeDoc(d));
               localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(normalized));
               return {
                 data: normalized,
@@ -99,13 +113,15 @@ class ApiService {
       }
     }
 
-    // Fallback: LocalStorage or Initial Documents
+    // Fallback: LocalStorage
     try {
       const cached = localStorage.getItem(CONFIG.STORAGE_KEY_DOCS);
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const normalized = parsed.map(d => this.normalizeDoc(d));
+        if (Array.isArray(parsed)) {
+          const cleaned = this.cleanDocsList(parsed);
+          const normalized = cleaned.map(d => this.normalizeDoc(d));
+          localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(normalized));
           return { data: normalized, settings: this.settings, isLive: false, message: 'แสดงข้อมูลจากความจำเครื่อง (ออฟไลน์)' };
         }
       }
@@ -113,9 +129,8 @@ class ApiService {
       console.error('Local cache read error:', e);
     }
 
-    const initNormalized = INITIAL_DOCUMENTS.map(d => this.normalizeDoc(d));
-    localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(initNormalized));
-    return { data: initNormalized, settings: this.settings, isLive: false, message: 'แสดงข้อมูลตัวอย่างเริ่มต้น' };
+    localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify([]));
+    return { data: [], settings: this.settings, isLive: false, message: 'ยังไม่มีเอกสารในระบบ' };
   }
 
   // Normalize document to ensure attachments array always exists
@@ -505,11 +520,16 @@ class ApiService {
   getLocalDocuments() {
     try {
       const saved = localStorage.getItem(CONFIG.STORAGE_KEY_DOCS);
-      const list = saved ? JSON.parse(saved) : [...INITIAL_DOCUMENTS];
-      return Array.isArray(list) ? list.map(d => this.normalizeDoc(d)) : [];
+      const list = saved ? JSON.parse(saved) : [];
+      return Array.isArray(list) ? this.cleanDocsList(list).map(d => this.normalizeDoc(d)) : [];
     } catch {
-      return INITIAL_DOCUMENTS.map(d => this.normalizeDoc(d));
+      return [];
     }
+  }
+
+  // Clear all mock and local documents
+  clearAllLocalDocuments() {
+    localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify([]));
   }
 
   updateLocalDocument(updated) {

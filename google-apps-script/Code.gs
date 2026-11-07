@@ -152,6 +152,10 @@ function doPost(e) {
       return jsonResponse(handleDeleteDocument(payload));
     }
 
+    if (action === 'clearAllDocs') {
+      return jsonResponse(handleClearAllDocuments());
+    }
+
     if (action === 'incrementDownload') {
       return jsonResponse(handleIncrementCount(payload.id, 'downloadCount'));
     }
@@ -534,16 +538,44 @@ function handleIncrementCount(docId, countField) {
 }
 
 /**
+ * 7. Clear All Documents (Purge all mock / test data)
+ */
+function handleClearAllDocuments() {
+  try {
+    const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+    const sheet = getTargetSheet(ss);
+    if (!sheet) throw new Error('Sheet not found');
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      sheet.deleteRows(2, lastRow - 1);
+    }
+
+    return {
+      success: true,
+      message: 'ลบข้อมูลจำลองทั้งหมดใน Google Sheet เรียบร้อยแล้ว!'
+    };
+  } catch (err) {
+    return { success: false, error: err.toString() };
+  }
+}
+
+/**
  * 8. Read All Documents from Sheet
  */
 function getAllDocuments() {
   const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
   let sheet = getTargetSheet(ss);
   
-  if (!sheet || sheet.getLastRow() <= 1) {
+  if (!sheet) {
     initDatabaseSheet();
     sheet = getTargetSheet(ss);
+  } else if (sheet.getLastRow() === 0) {
+    initDatabaseSheet();
   }
+
+  // If only header row exists (or sheet is completely blank), return empty list
+  if (sheet.getLastRow() <= 1) return [];
 
   const values = sheet.getDataRange().getValues();
   if (values.length <= 1) return [];
@@ -559,6 +591,9 @@ function getAllDocuments() {
     headers.forEach((h, idx) => {
       item[h] = row[idx];
     });
+
+    // Exclude any legacy mock items
+    if (String(item.id).startsWith('DOC-2026-00')) continue;
 
     item.isPinned = (item.isPinned === true || String(item.isPinned).toUpperCase() === 'TRUE');
     item.downloadCount = Number(item.downloadCount) || 0;

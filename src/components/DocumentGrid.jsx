@@ -17,7 +17,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Bookmark,
-  GripVertical
+  GripVertical,
+  FolderOpen
 } from 'lucide-react';
 
 const FILE_TYPE_CONFIG = {
@@ -155,16 +156,20 @@ export default function DocumentGrid({
 
   if (documents.length === 0) {
     return (
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-8 text-center border border-dashed border-slate-300 dark:border-slate-800 my-4">
-        <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto text-slate-400 mb-2">
-          <FileText className="w-6 h-6" />
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-10 sm:p-14 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 my-6 shadow-xs animate-in fade-in duration-300">
+        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 flex items-center justify-center mx-auto mb-4 shadow-sm ring-8 ring-teal-50/50 dark:ring-teal-950/30">
+          <FolderOpen className="w-8 h-8 sm:w-10 sm:h-10" />
         </div>
-        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1">
-          ไม่พบเอกสารในหมวดนี้
+        <h3 className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">
+          ยังไม่มีเอกสารในระบบ
         </h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-          ลองเลือกหมวดหมู่อื่น หรือปรับคำค้นหา
+        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed mb-4">
+          ระบบพร้อมสำหรับการใช้งานจริงแล้ว คลิกปุ่ม <strong className="text-teal-600 dark:text-teal-400 font-semibold">+ เพิ่มเอกสารใหม่</strong> ด้านล่างขวา เพื่อเริ่มต้นอัปโหลดเอกสารหรือแบบฟอร์มเข้าสู่ระบบ
         </p>
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-medium">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span>ระบบเชื่อมโยง Google Drive & Google Sheets อัตโนมัติ</span>
+        </div>
       </div>
     );
   }
