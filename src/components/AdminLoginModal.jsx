@@ -43,8 +43,8 @@ export default function AdminLoginModal({ isOpen, onClose, onLoginSuccess, curre
 
         {/* Modal Icon & Header */}
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-12 h-12 rounded-2xl bg-white shadow-md ring-1 ring-slate-200 dark:ring-slate-700 flex items-center justify-center p-1 flex-shrink-0">
-            <img src="/logo.png" alt="Logo" className="w-full h-full object-contain rounded-xl" />
+          <div className="w-12 h-12 flex items-center justify-center flex-shrink-0 drop-shadow-md">
+            <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
           </div>
           <div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white">

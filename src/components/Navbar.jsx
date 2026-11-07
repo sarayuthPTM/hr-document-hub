@@ -36,11 +36,11 @@ export default function Navbar({
           
           {/* Logo & Dynamic School Title */}
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl overflow-hidden bg-white shadow-sm ring-1 ring-slate-200 dark:ring-slate-700 flex items-center justify-center p-0.5 flex-shrink-0 transition-transform hover:scale-105">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center flex-shrink-0 transition-transform hover:scale-105 drop-shadow-sm">
               <img 
                 src="/logo.png" 
                 alt="KBS HR Docs Logo" 
-                className="w-full h-full object-contain rounded-xl"
+                className="w-full h-full object-contain"
               />
             </div>
             <div>

@@ -1,0 +1,27 @@
+{
+  "name": "KBS HR Docs",
+  "short_name": "KBS HR Docs",
+  "description": "ระบบรวบรวมเอกสารงานบุคคล โรงเรียนกาญจนาภิเษกวิทยาลัย กระบี่",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0d9488",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
