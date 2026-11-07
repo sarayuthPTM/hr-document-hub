@@ -67,7 +67,7 @@ export default function HeroBanner({
           {/* Left: Title & Quick Stats */}
           <div className="flex-1 min-w-0 flex items-center gap-3.5">
             <div className="w-12 h-12 sm:w-14 sm:h-14 flex-shrink-0 flex items-center justify-center drop-shadow-lg">
-              <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
+              <img src="/logo.png?v=4" alt="Logo" className="w-full h-full object-contain" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 mb-0.5">

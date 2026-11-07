@@ -38,7 +38,7 @@ export default function Navbar({
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center flex-shrink-0 transition-transform hover:scale-105 drop-shadow-sm">
               <img 
-                src="/logo.png" 
+                src="/logo.png?v=4" 
                 alt="KBS HR Docs Logo" 
                 className="w-full h-full object-contain"
               />
