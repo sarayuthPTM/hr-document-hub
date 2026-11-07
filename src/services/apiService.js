@@ -194,34 +194,61 @@ class ApiService {
 
     if (isLive) {
       try {
-        let payload = {
-          action: 'updateDoc',
-          ...docData
-        };
+        let updatedFields = { ...docData };
 
         if (fileBlob) {
+          // 1. ส่งไฟล์ขึ้น Google Drive ผ่าน action 'uploadFile' ที่เปิดใช้งานบน GAS อยู่แล้ว
           const base64 = await this.fileToBase64(fileBlob);
-          payload.fileName = fileBlob.name;
-          payload.fileData = base64;
-          payload.mimeType = fileBlob.type || 'application/octet-stream';
-          payload.fileType = docData.fileType || this.detectFileType(fileBlob.name);
-          payload.fileSize = this.formatBytes(fileBlob.size);
+          const uploadRes = await fetch(this.settings.gasUrl.trim(), {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              action: 'uploadFile',
+              fileName: fileBlob.name,
+              fileData: base64,
+              mimeType: fileBlob.type || 'application/octet-stream',
+              title: docData.title || fileBlob.name
+            })
+          });
+
+          const uploadData = await uploadRes.json();
+          if (uploadData.success && uploadData.document) {
+            // ดึงข้อมูลลิงก์ไฟล์จริงจาก Google Drive มาแทนที่
+            updatedFields.fileUrl = uploadData.document.fileUrl;
+            updatedFields.downloadUrl = uploadData.document.downloadUrl;
+            updatedFields.previewUrl = uploadData.document.previewUrl;
+            updatedFields.driveFileId = uploadData.document.driveFileId;
+            updatedFields.fileSize = uploadData.document.fileSize;
+            updatedFields.fileType = docData.fileType || uploadData.document.fileType || this.detectFileType(fileBlob.name);
+
+            // ลบแถวชั่วคราวที่ uploadFile สร้างไว้ เพื่อไม่ให้เกิดแถวซ้ำใน Google Sheet
+            if (uploadData.document.id && uploadData.document.id !== docData.id) {
+              fetch(this.settings.gasUrl.trim(), {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                  action: 'deleteDoc',
+                  id: uploadData.document.id
+                })
+              }).catch(() => {});
+            }
+          }
         }
 
+        // 2. อัปเดตแถวเอกสารเดิมใน Google Sheet
         const response = await fetch(this.settings.gasUrl.trim(), {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify({
+            action: 'updateDoc',
+            ...updatedFields
+          })
         });
 
         const result = await response.json();
         if (result.success) {
-          const updatedDoc = {
-            ...docData,
-            ...(result.document || {})
-          };
-          this.updateLocalDocument(updatedDoc);
-          return { success: true, document: updatedDoc, isLive: true };
+          this.updateLocalDocument(updatedFields);
+          return { success: true, document: updatedFields, isLive: true };
         }
       } catch (err) {
         console.warn('Update to GAS failed, saving locally:', err);
