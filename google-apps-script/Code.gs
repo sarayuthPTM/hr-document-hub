@@ -382,7 +382,7 @@ function handleAddDocument(data) {
 }
 
 /**
- * 5. Handle Update Document
+ * 5. Handle Update Document (รองรับการอัปโหลดไฟล์ใหม่จากคอมพิวเตอร์แทนที่ไฟล์เดิมได้ด้วย)
  */
 function handleUpdateDocument(data) {
   try {
@@ -408,6 +408,40 @@ function handleUpdateDocument(data) {
       throw new Error('ไม่พบเอกสารรหัส: ' + data.id);
     }
 
+    // หากมีการส่งไฟล์ใหม่มาด้วย ให้ทำการอัปโหลดไฟล์เข้า Google Drive
+    if (data.fileData && data.fileName) {
+      try {
+        const folder = DriveApp.getFolderById(CONFIG.DRIVE_FOLDER_ID);
+        const base64Data = data.fileData.includes('base64,') 
+          ? data.fileData.split('base64,')[1] 
+          : data.fileData;
+          
+        const decodedBlob = Utilities.newBlob(
+          Utilities.base64Decode(base64Data), 
+          data.mimeType || 'application/octet-stream', 
+          data.fileName || 'document.pdf'
+        );
+
+        const driveFile = folder.createFile(decodedBlob);
+        try {
+          driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        } catch(shareErr) {
+          Logger.log('Set sharing error: ' + shareErr.message);
+        }
+
+        data.fileUrl = driveFile.getUrl();
+        data.driveFileId = driveFile.getId();
+        data.downloadUrl = 'https://drive.google.com/uc?export=download&id=' + data.driveFileId;
+        data.previewUrl = 'https://drive.google.com/file/d/' + data.driveFileId + '/preview';
+        data.fileSize = formatBytes(driveFile.getSize());
+        if (!data.fileType || data.fileType === 'PDF') {
+          data.fileType = detectFileType(data.fileName);
+        }
+      } catch (uploadErr) {
+        Logger.log('Upload in update error: ' + uploadErr.toString());
+      }
+    }
+
     const updatedDate = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'dd/MM/yyyy HH:mm');
     headers.forEach((key, colIdx) => {
       if (data[key] !== undefined && key !== 'id' && key !== 'createdAt') {
@@ -421,7 +455,8 @@ function handleUpdateDocument(data) {
     return {
       success: true,
       message: 'แก้ไขข้อมูลเอกสารเรียบร้อย!',
-      id: data.id
+      id: data.id,
+      document: data
     };
 
   } catch (err) {

@@ -184,7 +184,7 @@ export default function App() {
       await apiService.updateDocument({
         ...editingDoc,
         ...formData
-      });
+      }, fileBlob);
       showToast('แก้ไขข้อมูลเอกสารเรียบร้อย', 'success');
       loadDocs();
     } else {

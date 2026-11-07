@@ -178,16 +178,25 @@ class ApiService {
     return { success: true, document: newDoc, isLive: false };
   }
 
-  // Update existing document
-  async updateDocument(docData) {
+  // Update existing document (รองรับการอัปโหลดไฟล์ใหม่จากคอมพิวเตอร์แทนที่ไฟล์เดิม)
+  async updateDocument(docData, fileBlob = null) {
     const isLive = Boolean(this.settings.gasUrl && this.settings.gasUrl.trim());
 
     if (isLive) {
       try {
-        const payload = {
+        let payload = {
           action: 'updateDoc',
           ...docData
         };
+
+        if (fileBlob) {
+          const base64 = await this.fileToBase64(fileBlob);
+          payload.fileName = fileBlob.name;
+          payload.fileData = base64;
+          payload.mimeType = fileBlob.type || 'application/octet-stream';
+          payload.fileType = docData.fileType || this.detectFileType(fileBlob.name);
+          payload.fileSize = this.formatBytes(fileBlob.size);
+        }
 
         const response = await fetch(this.settings.gasUrl.trim(), {
           method: 'POST',
@@ -197,16 +206,35 @@ class ApiService {
 
         const result = await response.json();
         if (result.success) {
-          this.updateLocalDocument(docData);
-          return { success: true, isLive: true };
+          const updatedDoc = {
+            ...docData,
+            ...(result.document || {})
+          };
+          this.updateLocalDocument(updatedDoc);
+          return { success: true, document: updatedDoc, isLive: true };
         }
       } catch (err) {
         console.warn('Update to GAS failed, saving locally:', err);
       }
     }
 
-    this.updateLocalDocument(docData);
-    return { success: true, isLive: false };
+    // Local / Offline fallback update
+    const updated = {
+      ...docData,
+      updatedAt: new Date().toLocaleDateString('th-TH') + ' ' + new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+    };
+
+    if (fileBlob) {
+      const localUrl = URL.createObjectURL(fileBlob);
+      updated.fileUrl = localUrl;
+      updated.downloadUrl = localUrl;
+      updated.previewUrl = localUrl;
+      updated.fileSize = this.formatBytes(fileBlob.size);
+      updated.fileType = docData.fileType || this.detectFileType(fileBlob.name);
+    }
+
+    this.updateLocalDocument(updated);
+    return { success: true, document: updated, isLive: false };
   }
 
   // Delete document
