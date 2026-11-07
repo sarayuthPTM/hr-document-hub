@@ -16,7 +16,8 @@ import {
   Flame,
   ChevronLeft,
   ChevronRight,
-  Bookmark
+  Bookmark,
+  GripVertical
 } from 'lucide-react';
 
 const FILE_TYPE_CONFIG = {
@@ -58,21 +59,63 @@ export default function DocumentGrid({
   onTogglePin,
   favorites = [],
   onToggleFavorite,
-  layoutMode = 'slider' // 'slider' | 'grid'
+  onReorder,
+  layoutMode = 'grid' // 'grid' | 'slider'
 }) {
   const [copiedId, setCopiedId] = useState(null);
   const sliderRef = useRef(null);
 
-  // Mouse Drag to Scroll State
+  // Drag-and-Drop Reorder State
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+
+  // Mouse Drag to Scroll (in slider mode only)
   const [isDown, setIsDown] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
-  const [hasDragged, setHasDragged] = useState(false);
+  const [hasDraggedScroll, setHasDraggedScroll] = useState(false);
 
+  // Drag & Drop handlers for reordering
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', index.toString());
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = (e, targetIndex) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+    if (onReorder) {
+      onReorder(draggedIndex, targetIndex);
+    }
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  // Slider scroll handlers
   const handleMouseDown = (e) => {
-    if (!sliderRef.current) return;
+    if (layoutMode !== 'slider' || !sliderRef.current) return;
+    // Don't scroll if user is dragging by the grip handle
+    if (e.target.closest('.drag-handle')) return;
     setIsDown(true);
-    setHasDragged(false);
+    setHasDraggedScroll(false);
     setStartX(e.pageX - sliderRef.current.offsetLeft);
     setScrollLeft(sliderRef.current.scrollLeft);
   };
@@ -83,16 +126,16 @@ export default function DocumentGrid({
 
   const handleMouseUp = () => {
     setIsDown(false);
-    setTimeout(() => setHasDragged(false), 80);
+    setTimeout(() => setHasDraggedScroll(false), 80);
   };
 
   const handleMouseMove = (e) => {
-    if (!isDown || !sliderRef.current) return;
+    if (!isDown || !sliderRef.current || layoutMode !== 'slider') return;
     e.preventDefault();
     const x = e.pageX - sliderRef.current.offsetLeft;
-    const walk = (x - startX) * 1.5; // Drag speed multiplier
+    const walk = (x - startX) * 1.5;
     if (Math.abs(walk) > 5) {
-      setHasDragged(true);
+      setHasDraggedScroll(true);
     }
     sliderRef.current.scrollLeft = scrollLeft - walk;
   };
@@ -126,26 +169,48 @@ export default function DocumentGrid({
     );
   }
 
-  // Render individual compact card
-  const renderCard = (doc) => {
+  // Render Card Component
+  const renderCard = (doc, idx) => {
     const fileConf = FILE_TYPE_CONFIG[doc.fileType] || FILE_TYPE_CONFIG.DEFAULT;
     const IconComponent = fileConf.icon;
     const isFav = favorites.includes(doc.id);
     const isPopular = (doc.downloadCount || 0) >= 150;
+    const isBeingDragged = draggedIndex === idx;
+    const isDropTarget = dragOverIndex === idx && draggedIndex !== idx;
 
     return (
       <div
         key={doc.id}
-        className={`group relative bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-lg transition-all duration-200 flex flex-col justify-between ${
+        draggable={true}
+        onDragStart={(e) => handleDragStart(e, idx)}
+        onDragOver={(e) => handleDragOver(e, idx)}
+        onDrop={(e) => handleDrop(e, idx)}
+        onDragEnd={handleDragEnd}
+        className={`group relative bg-white dark:bg-slate-900 rounded-2xl p-4 border transition-all duration-200 flex flex-col justify-between cursor-grab active:cursor-grabbing ${
           layoutMode === 'slider' ? 'w-[295px] flex-shrink-0 select-none' : 'w-full'
         } ${
-          doc.isPinned ? 'ring-1.5 ring-teal-500/50 bg-gradient-to-b from-teal-50/20 to-white dark:from-teal-950/20 dark:to-slate-900' : ''
+          isBeingDragged 
+            ? 'opacity-40 scale-95 border-dashed border-2 border-teal-500 bg-teal-50/30' 
+            : isDropTarget
+            ? 'ring-2 ring-teal-500 border-teal-500 scale-[1.02] shadow-xl'
+            : doc.isPinned 
+            ? 'border-teal-300 dark:border-teal-800/80 shadow-sm ring-1 ring-teal-500/30 bg-gradient-to-b from-teal-50/20 to-white dark:from-teal-950/20 dark:to-slate-900' 
+            : 'border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-teal-400/80'
         }`}
       >
-        {/* Top Badges & Actions */}
+        {/* Top Badges & Drag Grip Handle */}
         <div>
           <div className="flex items-center justify-between gap-1 mb-2">
             <div className="flex items-center gap-1.5 flex-wrap">
+              
+              {/* Drag Handle Icon */}
+              <div 
+                className="drag-handle p-1 -ml-1 text-slate-300 hover:text-teal-600 dark:text-slate-600 dark:hover:text-teal-400 cursor-grab active:cursor-grabbing transition-colors rounded"
+                title="คลิกค้างแล้วลากเพื่อสลับลำดับการ์ด (อยู่ก่อน/อยู่หลัง)"
+              >
+                <GripVertical className="w-3.5 h-3.5" />
+              </div>
+
               {/* File Type */}
               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase border ${fileConf.badge}`}>
                 <IconComponent className="w-3 h-3" />
@@ -179,6 +244,7 @@ export default function DocumentGrid({
             {/* Favorite / Bookmark Button */}
             <button
               type="button"
+              draggable={false}
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleFavorite(doc.id);
@@ -199,10 +265,10 @@ export default function DocumentGrid({
             {doc.category}
           </div>
 
-          {/* Title (Compact & Clickable) */}
+          {/* Title */}
           <h3 
             onClick={() => {
-              if (!hasDragged) onPreview(doc);
+              if (!hasDraggedScroll) onPreview(doc);
             }}
             className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white line-clamp-2 mb-1.5 group-hover:text-teal-600 dark:group-hover:text-teal-400 cursor-pointer transition-colors leading-snug"
             title={doc.title}
@@ -245,13 +311,13 @@ export default function DocumentGrid({
             </div>
           </div>
 
-          {/* Compact Action Buttons */}
-          <div className="flex items-center gap-1.5">
+          {/* Action Buttons */}
+          <div className="flex items-center gap-1.5" draggable={false}>
             {/* Preview */}
             <button
               type="button"
               onClick={() => {
-                if (!hasDragged) onPreview(doc);
+                if (!hasDraggedScroll) onPreview(doc);
               }}
               className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl text-xs font-semibold bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/80 border border-teal-200/80 dark:border-teal-800 transition-colors"
             >
@@ -263,7 +329,7 @@ export default function DocumentGrid({
             <button
               type="button"
               onClick={() => {
-                if (!hasDragged) onDownload(doc);
+                if (!hasDraggedScroll) onDownload(doc);
               }}
               className="p-1.5 rounded-xl text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors"
               title="ดาวน์โหลดไฟล์"
@@ -275,7 +341,7 @@ export default function DocumentGrid({
             <button
               type="button"
               onClick={() => {
-                if (!hasDragged) onOpenQR(doc);
+                if (!hasDraggedScroll) onOpenQR(doc);
               }}
               className="p-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors"
               title="QR Code ดาวน์โหลดผ่านมือถือ"
@@ -287,7 +353,7 @@ export default function DocumentGrid({
             <button
               type="button"
               onClick={() => {
-                if (!hasDragged) handleCopy(doc);
+                if (!hasDraggedScroll) handleCopy(doc);
               }}
               className="p-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors"
               title="คัดลอกลิงก์ไฟล์"
@@ -327,16 +393,16 @@ export default function DocumentGrid({
     );
   };
 
-  // Slider Mode (Mouse Drag & Horizontal Scroll)
-  if (layoutMode === 'slider') {
-    return (
-      <div className="relative my-3">
-        {/* Drag Hint & Navigation Controls */}
-        <div className="flex items-center justify-between text-xs text-slate-400 mb-2 px-1">
-          <span className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse"></span>
-            <span>คลิกค้างแล้วลากเมาส์ไปซ้าย-ขวาเพื่อเลื่อนดูการ์ด</span>
-          </span>
+  return (
+    <div className="space-y-2 my-2">
+      {/* Drag & Reorder Instruction Hint */}
+      <div className="flex items-center justify-between text-xs text-slate-400 px-1 py-1">
+        <span className="flex items-center gap-1.5">
+          <GripVertical className="w-3.5 h-3.5 text-teal-600" />
+          <span>สามารถ<strong>คลิกค้างแล้วลากการ์ด</strong> เพื่อสลับลำดับก่อน-หลังได้ทันที 🔄</span>
+        </span>
+
+        {layoutMode === 'slider' && (
           <div className="flex items-center gap-1">
             <button
               onClick={() => scrollSlider('left')}
@@ -353,30 +419,29 @@ export default function DocumentGrid({
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
-        </div>
+        )}
+      </div>
 
-        {/* Draggable Track Container */}
+      {/* Presentation Mode: Grid vs Slider */}
+      {layoutMode === 'slider' ? (
         <div
           ref={sliderRef}
           onMouseDown={handleMouseDown}
           onMouseLeave={handleMouseLeave}
           onMouseUp={handleMouseUp}
           onMouseMove={handleMouseMove}
-          className={`flex items-stretch gap-3.5 overflow-x-auto pb-3 pt-1 scrollbar-none cursor-grab active:cursor-grabbing select-none transition-all ${
+          className={`flex items-stretch gap-3.5 overflow-x-auto pb-3 pt-1 scrollbar-none transition-all ${
             isDown ? 'cursor-grabbing' : ''
           }`}
           style={{ scrollBehavior: isDown ? 'auto' : 'smooth' }}
         >
-          {documents.map(renderCard)}
+          {documents.map((doc, idx) => renderCard(doc, idx))}
         </div>
-      </div>
-    );
-  }
-
-  // Grid Mode (Compact multi-column grid)
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 my-3">
-      {documents.map(renderCard)}
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 pb-3 pt-1">
+          {documents.map((doc, idx) => renderCard(doc, idx))}
+        </div>
+      )}
     </div>
   );
 }

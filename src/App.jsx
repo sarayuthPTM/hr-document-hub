@@ -67,8 +67,8 @@ export default function App() {
   const [selectedYear, setSelectedYear] = useState('ทั้งหมด');
   const [selectedAudience, setSelectedAudience] = useState('ทั้งหมด');
   const [selectedFileType, setSelectedFileType] = useState('ทั้งหมด');
-  const [sortBy, setSortBy] = useState('pinned'); // 'pinned' | 'newest' | 'downloads' | 'title'
-  const [viewMode, setViewMode] = useState('slider'); // 'slider' | 'grid' | 'table'
+  const [sortBy, setSortBy] = useState('custom'); // 'custom' | 'pinned' | 'newest' | 'downloads' | 'title'
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'slider' | 'table'
 
   // Modals state
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -113,6 +113,28 @@ export default function App() {
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
+  };
+
+  // Reorder documents (Drag & Drop)
+  const handleReorderDocs = (fromIndex, toIndex) => {
+    // Find the item in filteredDocuments or documents
+    const docToMove = filteredDocuments[fromIndex];
+    if (!docToMove) return;
+
+    const newDocs = [...documents];
+    const actualFromIdx = newDocs.findIndex(d => d.id === docToMove.id);
+    const targetDoc = filteredDocuments[toIndex];
+    const actualToIdx = targetDoc ? newDocs.findIndex(d => d.id === targetDoc.id) : toIndex;
+
+    if (actualFromIdx === -1 || actualToIdx === -1) return;
+
+    const [moved] = newDocs.splice(actualFromIdx, 1);
+    newDocs.splice(actualToIdx, 0, moved);
+
+    setDocuments(newDocs);
+    setSortBy('custom');
+    localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(newDocs));
+    showToast('สลับลำดับเอกสารเรียบร้อยแล้ว', 'success');
   };
 
   // Toggle favorite
@@ -271,6 +293,9 @@ export default function App() {
 
       return true;
     }).sort((a, b) => {
+      if (sortBy === 'custom') {
+        return 0; // Preserve drag-and-drop custom order!
+      }
       if (sortBy === 'pinned') {
         if (a.isPinned && !b.isPinned) return -1;
         if (!a.isPinned && b.isPinned) return 1;
@@ -385,6 +410,7 @@ export default function App() {
                       setSelectedAudience('ทั้งหมด');
                       setSelectedFileType('ทั้งหมด');
                       setSearchQuery('');
+                      setSortBy('custom');
                     }}
                     className="text-[11px] text-rose-500 hover:text-rose-600 font-semibold px-1.5 py-1 hover:underline"
                   >
@@ -404,6 +430,7 @@ export default function App() {
                     onChange={(e) => setSortBy(e.target.value)}
                     className="appearance-none pl-2.5 pr-7 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-medium cursor-pointer"
                   >
+                    <option value="custom">ลำดับตามที่ลากสลับ 🔄</option>
                     <option value="pinned">แนะนำ / ปักหมุด</option>
                     <option value="newest">เอกสารล่าสุด</option>
                     <option value="downloads">ยอดดาวน์โหลดสูงสุด</option>
@@ -422,20 +449,8 @@ export default function App() {
                   <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-teal-600' : ''}`} />
                 </button>
 
-                {/* View Mode Toggle: Slider vs Grid vs Table */}
+                {/* View Mode Toggle: Grid vs Slider vs Table */}
                 <div className="flex items-center p-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-                  <button
-                    onClick={() => setViewMode('slider')}
-                    className={`px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition-colors ${
-                      viewMode === 'slider'
-                        ? 'bg-white dark:bg-slate-700 text-teal-600 dark:text-teal-400 shadow-xs'
-                        : 'text-slate-500 hover:text-slate-900'
-                    }`}
-                    title="มุมมองสไลด์ลากเมาส์"
-                  >
-                    <SlidersHorizontal className="w-3 h-3" />
-                    <span className="hidden sm:inline">สไลด์</span>
-                  </button>
                   <button
                     onClick={() => setViewMode('grid')}
                     className={`px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition-colors ${
@@ -443,10 +458,22 @@ export default function App() {
                         ? 'bg-white dark:bg-slate-700 text-teal-600 dark:text-teal-400 shadow-xs'
                         : 'text-slate-500 hover:text-slate-900'
                     }`}
-                    title="มุมมองการ์ดกะทัดรัด"
+                    title="มุมมองการ์ด (ลากเมาส์สลับลำดับได้)"
                   >
                     <LayoutGrid className="w-3 h-3" />
                     <span className="hidden sm:inline">การ์ด</span>
+                  </button>
+                  <button
+                    onClick={() => setViewMode('slider')}
+                    className={`px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition-colors ${
+                      viewMode === 'slider'
+                        ? 'bg-white dark:bg-slate-700 text-teal-600 dark:text-teal-400 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                    title="มุมมองสไลด์แนวนอน"
+                  >
+                    <SlidersHorizontal className="w-3 h-3" />
+                    <span className="hidden sm:inline">สไลด์</span>
                   </button>
                   <button
                     onClick={() => setViewMode('table')}
@@ -492,6 +519,7 @@ export default function App() {
                 onTogglePin={handleTogglePin}
                 favorites={favorites}
                 onToggleFavorite={handleToggleFavorite}
+                onReorder={handleReorderDocs}
                 layoutMode={viewMode}
               />
             )}
