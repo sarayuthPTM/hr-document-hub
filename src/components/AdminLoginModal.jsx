@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Lock, KeyRound, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { X, Lock, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { CONFIG } from '../config/constants';
 
 export default function AdminLoginModal({ isOpen, onClose, onLoginSuccess, currentPin }) {
@@ -30,26 +30,26 @@ export default function AdminLoginModal({ isOpen, onClose, onLoginSuccess, curre
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
-        className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 relative"
+        className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 sm:p-7 relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* Modal Icon & Header */}
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-teal-600 to-emerald-500 text-white flex items-center justify-center mb-4 shadow-lg shadow-teal-500/30">
-          <KeyRound className="w-7 h-7" />
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-teal-600 to-emerald-500 text-white flex items-center justify-center mb-3 shadow-md shadow-teal-500/20">
+          <KeyRound className="w-6 h-6" />
         </div>
 
-        <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-1">
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
           เข้าสู่ระบบผู้ดูแลระบบ (Admin)
         </h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-5">
           กรอกรหัสผ่านเพื่อเข้าจัดการ เพิ่ม แก้ไข และลบเอกสารในระบบ
         </p>
 
@@ -68,8 +68,8 @@ export default function AdminLoginModal({ isOpen, onClose, onLoginSuccess, curre
                   setError('');
                 }}
                 autoFocus
-                placeholder="ระบุรหัสผ่าน (เริ่มต้น: admin1234)"
-                className="w-full pl-4 pr-11 py-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all font-mono"
+                placeholder="ระบุรหัสผ่าน..."
+                className="w-full pl-4 pr-11 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all font-mono"
               />
               <button
                 type="button"
@@ -84,13 +84,10 @@ export default function AdminLoginModal({ isOpen, onClose, onLoginSuccess, curre
                 {error}
               </p>
             )}
-            <p className="text-[11px] text-slate-400 mt-1">
-              * รหัสผ่านตั้งต้นจากระบบคือ: <code className="text-teal-600 dark:text-teal-400 font-mono font-bold">admin1234</code>
-            </p>
           </div>
 
           <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 pt-1">
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={rememberMe}
@@ -104,7 +101,7 @@ export default function AdminLoginModal({ isOpen, onClose, onLoginSuccess, curre
           <div className="pt-2">
             <button
               type="submit"
-              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-bold text-sm shadow-md shadow-teal-600/30 transition-all active:scale-95"
+              className="w-full py-3 rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-bold text-sm shadow-md shadow-teal-600/30 transition-all active:scale-95"
             >
               เข้าสู่ระบบทันที
             </button>
