@@ -11,10 +11,19 @@
 const CONFIG = {
   SHEET_ID: '1i_1vctvE4Si6ylObH24ipOyTz2uSY6kXMKGNpd2N5WY',
   DRIVE_FOLDER_ID: '1mKdJUgQ9iEnVsJw-DeWV_NRnkAQsBsAt',
-  SHEET_NAME_DOCS: 'เอกสารงานบุคคล',
-  SHEET_NAME_LOGS: 'ประวัติการใช้งาน',
+  // รองรับทั้งชื่อ 'ข้อมูล' (ที่ผู้ใช้สร้างไว้) หรือ 'เอกสารงานบุคคล'
+  PRIMARY_SHEET_NAMES: ['ข้อมูล', 'เอกสารงานบุคคล', 'Sheet1'],
   TIMEZONE: 'Asia/Bangkok'
 };
+
+// Helper: ค้นหา Sheet แผ่นงานข้อมูล
+function getTargetSheet(ss) {
+  for (let name of CONFIG.PRIMARY_SHEET_NAMES) {
+    const s = ss.getSheetByName(name);
+    if (s) return s;
+  }
+  return ss.getSheets()[0];
+}
 
 // Response Helper with CORS
 function jsonResponse(data, status = 200) {
@@ -212,7 +221,6 @@ function handleAddDocument(data) {
     let previewUrl = data.fileUrl;
     let downloadUrl = data.fileUrl;
 
-    // Extract Google Drive ID if present
     if (data.fileUrl && data.fileUrl.includes('drive.google.com')) {
       const match = data.fileUrl.match(/[-\w]{25,}/);
       if (match) {
@@ -266,7 +274,7 @@ function handleUpdateDocument(data) {
     if (!data.id) throw new Error('Missing document ID');
     
     const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
-    const sheet = ss.getSheetByName(CONFIG.SHEET_NAME_DOCS);
+    const sheet = getTargetSheet(ss);
     if (!sheet) throw new Error('Sheet not found');
 
     const values = sheet.getDataRange().getValues();
@@ -276,7 +284,7 @@ function handleUpdateDocument(data) {
     let rowIndex = -1;
     for (let i = 1; i < values.length; i++) {
       if (String(values[i][idColIndex]) === String(data.id)) {
-        rowIndex = i + 1; // 1-based index
+        rowIndex = i + 1;
         break;
       }
     }
@@ -285,7 +293,6 @@ function handleUpdateDocument(data) {
       throw new Error('ไม่พบเอกสารรหัส: ' + data.id);
     }
 
-    // Update fields
     const updatedDate = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'dd/MM/yyyy HH:mm');
     headers.forEach((key, colIdx) => {
       if (data[key] !== undefined && key !== 'id' && key !== 'createdAt') {
@@ -315,7 +322,7 @@ function handleDeleteDocument(data) {
     if (!data.id) throw new Error('Missing document ID');
 
     const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
-    const sheet = ss.getSheetByName(CONFIG.SHEET_NAME_DOCS);
+    const sheet = getTargetSheet(ss);
     if (!sheet) throw new Error('Sheet not found');
 
     const values = sheet.getDataRange().getValues();
@@ -353,7 +360,7 @@ function handleIncrementCount(docId, countField) {
   try {
     if (!docId) return { success: false };
     const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
-    const sheet = ss.getSheetByName(CONFIG.SHEET_NAME_DOCS);
+    const sheet = getTargetSheet(ss);
     if (!sheet) return { success: false };
 
     const values = sheet.getDataRange().getValues();
@@ -381,12 +388,11 @@ function handleIncrementCount(docId, countField) {
  */
 function getAllDocuments() {
   const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
-  let sheet = ss.getSheetByName(CONFIG.SHEET_NAME_DOCS);
+  let sheet = getTargetSheet(ss);
   
-  if (!sheet) {
-    // Auto initialize if sheet doesn't exist
+  if (!sheet || sheet.getLastRow() <= 1) {
     initDatabaseSheet();
-    sheet = ss.getSheetByName(CONFIG.SHEET_NAME_DOCS);
+    sheet = getTargetSheet(ss);
   }
 
   const values = sheet.getDataRange().getValues();
@@ -397,7 +403,6 @@ function getAllDocuments() {
 
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
-    // Skip empty rows
     if (!row[0] && !row[1]) continue;
 
     const item = {};
@@ -405,7 +410,6 @@ function getAllDocuments() {
       item[h] = row[idx];
     });
 
-    // Format isPinned as boolean
     item.isPinned = (item.isPinned === true || String(item.isPinned).toUpperCase() === 'TRUE');
     item.downloadCount = Number(item.downloadCount) || 0;
     item.viewCount = Number(item.viewCount) || 0;
@@ -413,7 +417,6 @@ function getAllDocuments() {
     list.push(item);
   }
 
-  // Sort: pinned first, then by date descending
   list.sort((a, b) => {
     if (a.isPinned && !b.isPinned) return -1;
     if (!a.isPinned && b.isPinned) return 1;
@@ -428,7 +431,7 @@ function getAllDocuments() {
  */
 function appendDocumentToSheet(doc) {
   const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
-  const sheet = ss.getSheetByName(CONFIG.SHEET_NAME_DOCS);
+  const sheet = getTargetSheet(ss);
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   
   const row = headers.map(key => {
@@ -443,10 +446,10 @@ function appendDocumentToSheet(doc) {
  */
 function initDatabaseSheet() {
   const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  let sheet = getTargetSheet(ss);
   
-  let sheet = ss.getSheetByName(CONFIG.SHEET_NAME_DOCS);
   if (!sheet) {
-    sheet = ss.insertSheet(CONFIG.SHEET_NAME_DOCS);
+    sheet = ss.insertSheet('ข้อมูล');
   }
 
   const headers = [
@@ -457,10 +460,10 @@ function initDatabaseSheet() {
     'createdAt', 'updatedAt', 'uploadedBy'
   ];
 
-  // Set Headers
+  // Set Headers at row 1
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   
-  // Format Header row
+  // Format Header row: เขียวมรกต + ตัวหนา + จัดกึ่งกลาง
   const headerRange = sheet.getRange(1, 1, 1, headers.length);
   headerRange.setBackground('#0d9488'); // Emerald / Teal
   headerRange.setFontColor('#ffffff');
