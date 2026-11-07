@@ -83,9 +83,10 @@ class ApiService {
             }
 
             if (Array.isArray(resJson.data)) {
-              localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(resJson.data));
+              const normalized = resJson.data.map(d => this.normalizeDoc(d));
+              localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(normalized));
               return {
-                data: resJson.data,
+                data: normalized,
                 settings: this.settings,
                 isLive: true,
                 message: 'ดึงข้อมูลสดจาก Google Sheet สำเร็จ'
@@ -104,39 +105,141 @@ class ApiService {
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return { data: parsed, settings: this.settings, isLive: false, message: 'แสดงข้อมูลจากความจำเครื่อง (ออฟไลน์)' };
+          const normalized = parsed.map(d => this.normalizeDoc(d));
+          return { data: normalized, settings: this.settings, isLive: false, message: 'แสดงข้อมูลจากความจำเครื่อง (ออฟไลน์)' };
         }
       }
     } catch (e) {
       console.error('Local cache read error:', e);
     }
 
-    localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(INITIAL_DOCUMENTS));
-    return { data: INITIAL_DOCUMENTS, settings: this.settings, isLive: false, message: 'แสดงข้อมูลตัวอย่างเริ่มต้น' };
+    const initNormalized = INITIAL_DOCUMENTS.map(d => this.normalizeDoc(d));
+    localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(initNormalized));
+    return { data: initNormalized, settings: this.settings, isLive: false, message: 'แสดงข้อมูลตัวอย่างเริ่มต้น' };
   }
 
-  // Add Document
-  async addDocument(docData, fileBlob = null) {
-    const isLive = Boolean(this.settings.gasUrl && this.settings.gasUrl.trim());
+  // Normalize document to ensure attachments array always exists
+  normalizeDoc(doc) {
+    if (!doc) return doc;
+    let attachments = doc.attachments;
+    if (typeof attachments === 'string' && attachments.trim() !== '') {
+      try {
+        attachments = JSON.parse(attachments);
+      } catch (e) {
+        attachments = null;
+      }
+    }
+    if (!Array.isArray(attachments) || attachments.length === 0) {
+      if (doc.fileUrl) {
+        attachments = [{
+          name: doc.fileName || doc.title || 'เอกสารแนบ',
+          url: doc.fileUrl,
+          downloadUrl: doc.downloadUrl || doc.fileUrl,
+          previewUrl: doc.previewUrl || doc.fileUrl,
+          size: doc.fileSize || '',
+          type: doc.fileType || 'FILE',
+          driveId: doc.driveFileId || ''
+        }];
+      } else {
+        attachments = [];
+      }
+    }
+    return {
+      ...doc,
+      attachments
+    };
+  }
 
+  // Helper: Upload a single file to Drive via live GAS endpoint
+  async uploadFileToDrive(fileBlob, title = '') {
+    const isLive = Boolean(this.settings.gasUrl && this.settings.gasUrl.trim());
     if (isLive) {
       try {
-        let payload = {};
-        if (fileBlob) {
-          const base64 = await this.fileToBase64(fileBlob);
-          payload = {
+        const base64 = await this.fileToBase64(fileBlob);
+        const res = await fetch(this.settings.gasUrl.trim(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
             action: 'uploadFile',
             fileName: fileBlob.name,
             fileData: base64,
             mimeType: fileBlob.type || 'application/octet-stream',
-            ...docData
-          };
-        } else {
-          payload = {
-            action: 'addDoc',
-            ...docData
+            title: title || fileBlob.name
+          })
+        });
+
+        const data = await res.json();
+        if (data.success && data.document) {
+          // Clean up the temporary row created by uploadFile
+          if (data.document.id) {
+            fetch(this.settings.gasUrl.trim(), {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({ action: 'deleteDoc', id: data.document.id })
+            }).catch(() => {});
+          }
+
+          return {
+            name: fileBlob.name,
+            url: data.document.fileUrl,
+            downloadUrl: data.document.downloadUrl,
+            previewUrl: data.document.previewUrl,
+            driveId: data.document.driveFileId,
+            size: data.document.fileSize || this.formatBytes(fileBlob.size),
+            type: data.document.fileType || this.detectFileType(fileBlob.name)
           };
         }
+      } catch (err) {
+        console.warn('Upload file to Drive error:', err);
+      }
+    }
+
+    // Local / Offline fallback
+    const localUrl = URL.createObjectURL(fileBlob);
+    return {
+      name: fileBlob.name,
+      url: localUrl,
+      downloadUrl: localUrl,
+      previewUrl: localUrl,
+      driveId: '',
+      size: this.formatBytes(fileBlob.size),
+      type: this.detectFileType(fileBlob.name)
+    };
+  }
+
+  // Add Document (รองรับ 1 ไฟล์ หรือหลายไฟล์พร้อมกัน)
+  async addDocument(docData, newFiles = []) {
+    const filesArray = Array.isArray(newFiles) ? newFiles : (newFiles ? [newFiles] : []);
+    const isLive = Boolean(this.settings.gasUrl && this.settings.gasUrl.trim());
+
+    let uploadedAttachments = [];
+    if (filesArray.length > 0) {
+      for (const file of filesArray) {
+        const uploaded = await this.uploadFileToDrive(file, docData.title);
+        uploadedAttachments.push(uploaded);
+      }
+    }
+
+    const payloadDoc = { ...docData };
+    if (uploadedAttachments.length > 0) {
+      const primary = uploadedAttachments[0];
+      payloadDoc.fileUrl = primary.url;
+      payloadDoc.downloadUrl = primary.downloadUrl;
+      payloadDoc.previewUrl = primary.previewUrl;
+      payloadDoc.driveFileId = primary.driveId;
+      payloadDoc.fileSize = primary.size;
+      payloadDoc.fileType = primary.type;
+      payloadDoc.fileName = primary.name;
+      payloadDoc.attachments = uploadedAttachments;
+    }
+
+    if (isLive) {
+      try {
+        const payload = {
+          action: 'addDoc',
+          ...payloadDoc,
+          attachments: JSON.stringify(uploadedAttachments)
+        };
 
         const response = await fetch(this.settings.gasUrl.trim(), {
           method: 'POST',
@@ -146,10 +249,14 @@ class ApiService {
 
         const result = await response.json();
         if (result.success && result.document) {
+          const finalDoc = this.normalizeDoc({
+            ...result.document,
+            attachments: uploadedAttachments.length > 0 ? uploadedAttachments : result.document.attachments
+          });
           const currentDocs = this.getLocalDocuments();
-          currentDocs.unshift(result.document);
+          currentDocs.unshift(finalDoc);
           localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(currentDocs));
-          return { success: true, document: result.document, isLive: true };
+          return { success: true, document: finalDoc, isLive: true };
         }
       } catch (err) {
         console.warn('Add to GAS failed, falling back to local addition:', err);
@@ -157,29 +264,31 @@ class ApiService {
     }
 
     // Local addition
-    const newDoc = {
+    const newDoc = this.normalizeDoc({
       id: 'DOC-' + Date.now(),
-      title: docData.title || (fileBlob ? fileBlob.name : 'เอกสารใหม่'),
-      docNumber: docData.docNumber || '-',
-      category: docData.category || 'แบบฟอร์มใบลาและขออนุญาต',
-      fileType: docData.fileType || (fileBlob ? this.detectFileType(fileBlob.name) : 'PDF'),
-      fileUrl: docData.fileUrl || (fileBlob ? URL.createObjectURL(fileBlob) : CONFIG.DRIVE_URL),
-      downloadUrl: docData.fileUrl || (fileBlob ? URL.createObjectURL(fileBlob) : CONFIG.DRIVE_URL),
-      previewUrl: docData.fileUrl || (fileBlob ? URL.createObjectURL(fileBlob) : CONFIG.DRIVE_URL),
-      driveFileId: '',
-      fileSize: fileBlob ? this.formatBytes(fileBlob.size) : (docData.fileSize || '150 KB'),
-      targetAudience: docData.targetAudience || 'บุคลากรทุกคน',
-      academicYear: docData.academicYear || '2568',
-      tags: docData.tags || '',
-      description: docData.description || '',
+      title: payloadDoc.title || (filesArray[0] ? filesArray[0].name : 'เอกสารใหม่'),
+      docNumber: payloadDoc.docNumber || '-',
+      category: payloadDoc.category || 'แบบฟอร์มใบลาและขออนุญาต',
+      fileType: payloadDoc.fileType || 'PDF',
+      fileUrl: payloadDoc.fileUrl || CONFIG.DRIVE_URL,
+      downloadUrl: payloadDoc.downloadUrl || payloadDoc.fileUrl || CONFIG.DRIVE_URL,
+      previewUrl: payloadDoc.previewUrl || payloadDoc.fileUrl || CONFIG.DRIVE_URL,
+      driveFileId: payloadDoc.driveFileId || '',
+      fileSize: payloadDoc.fileSize || '150 KB',
+      fileName: payloadDoc.fileName || '',
+      attachments: uploadedAttachments,
+      targetAudience: payloadDoc.targetAudience || 'บุคลากรทุกคน',
+      academicYear: payloadDoc.academicYear || '2568',
+      tags: payloadDoc.tags || '',
+      description: payloadDoc.description || '',
       downloadCount: 0,
       viewCount: 0,
-      isPinned: Boolean(docData.isPinned),
+      isPinned: Boolean(payloadDoc.isPinned),
       status: 'active',
       createdAt: new Date().toLocaleDateString('th-TH') + ' ' + new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
       updatedAt: new Date().toLocaleDateString('th-TH') + ' ' + new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
       uploadedBy: 'Admin'
-    };
+    });
 
     const currentDocs = this.getLocalDocuments();
     currentDocs.unshift(newDoc);
@@ -188,67 +297,51 @@ class ApiService {
     return { success: true, document: newDoc, isLive: false };
   }
 
-  // Update existing document (รองรับการอัปโหลดไฟล์ใหม่จากคอมพิวเตอร์แทนที่ไฟล์เดิม)
-  async updateDocument(docData, fileBlob = null) {
+  // Update existing document (รองรับหลายไฟล์ + แสดงข้อมูลไฟล์เดิมชัดเจน)
+  async updateDocument(docData, newFiles = [], existingFiles = []) {
+    const filesArray = Array.isArray(newFiles) ? newFiles : (newFiles ? [newFiles] : []);
     const isLive = Boolean(this.settings.gasUrl && this.settings.gasUrl.trim());
+
+    let uploadedAttachments = [];
+    if (filesArray.length > 0) {
+      for (const file of filesArray) {
+        const uploaded = await this.uploadFileToDrive(file, docData.title);
+        uploadedAttachments.push(uploaded);
+      }
+    }
+
+    const allAttachments = [...(existingFiles || []), ...uploadedAttachments];
+    const updatedFields = { ...docData };
+
+    if (allAttachments.length > 0) {
+      const primary = allAttachments[0];
+      updatedFields.fileUrl = primary.url;
+      updatedFields.downloadUrl = primary.downloadUrl;
+      updatedFields.previewUrl = primary.previewUrl;
+      updatedFields.driveFileId = primary.driveId;
+      updatedFields.fileSize = primary.size;
+      updatedFields.fileType = primary.type;
+      updatedFields.fileName = primary.name;
+      updatedFields.attachments = allAttachments;
+    }
 
     if (isLive) {
       try {
-        let updatedFields = { ...docData };
-
-        if (fileBlob) {
-          // 1. ส่งไฟล์ขึ้น Google Drive ผ่าน action 'uploadFile' ที่เปิดใช้งานบน GAS อยู่แล้ว
-          const base64 = await this.fileToBase64(fileBlob);
-          const uploadRes = await fetch(this.settings.gasUrl.trim(), {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({
-              action: 'uploadFile',
-              fileName: fileBlob.name,
-              fileData: base64,
-              mimeType: fileBlob.type || 'application/octet-stream',
-              title: docData.title || fileBlob.name
-            })
-          });
-
-          const uploadData = await uploadRes.json();
-          if (uploadData.success && uploadData.document) {
-            // ดึงข้อมูลลิงก์ไฟล์จริงจาก Google Drive มาแทนที่
-            updatedFields.fileUrl = uploadData.document.fileUrl;
-            updatedFields.downloadUrl = uploadData.document.downloadUrl;
-            updatedFields.previewUrl = uploadData.document.previewUrl;
-            updatedFields.driveFileId = uploadData.document.driveFileId;
-            updatedFields.fileSize = uploadData.document.fileSize;
-            updatedFields.fileType = docData.fileType || uploadData.document.fileType || this.detectFileType(fileBlob.name);
-
-            // ลบแถวชั่วคราวที่ uploadFile สร้างไว้ เพื่อไม่ให้เกิดแถวซ้ำใน Google Sheet
-            if (uploadData.document.id && uploadData.document.id !== docData.id) {
-              fetch(this.settings.gasUrl.trim(), {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({
-                  action: 'deleteDoc',
-                  id: uploadData.document.id
-                })
-              }).catch(() => {});
-            }
-          }
-        }
-
-        // 2. อัปเดตแถวเอกสารเดิมใน Google Sheet
         const response = await fetch(this.settings.gasUrl.trim(), {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify({
             action: 'updateDoc',
-            ...updatedFields
+            ...updatedFields,
+            attachments: JSON.stringify(allAttachments)
           })
         });
 
         const result = await response.json();
         if (result.success) {
-          this.updateLocalDocument(updatedFields);
-          return { success: true, document: updatedFields, isLive: true };
+          const finalDoc = this.normalizeDoc(updatedFields);
+          this.updateLocalDocument(finalDoc);
+          return { success: true, document: finalDoc, isLive: true };
         }
       } catch (err) {
         console.warn('Update to GAS failed, saving locally:', err);
@@ -256,19 +349,10 @@ class ApiService {
     }
 
     // Local / Offline fallback update
-    const updated = {
-      ...docData,
+    const updated = this.normalizeDoc({
+      ...updatedFields,
       updatedAt: new Date().toLocaleDateString('th-TH') + ' ' + new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
-    };
-
-    if (fileBlob) {
-      const localUrl = URL.createObjectURL(fileBlob);
-      updated.fileUrl = localUrl;
-      updated.downloadUrl = localUrl;
-      updated.previewUrl = localUrl;
-      updated.fileSize = this.formatBytes(fileBlob.size);
-      updated.fileType = docData.fileType || this.detectFileType(fileBlob.name);
-    }
+    });
 
     this.updateLocalDocument(updated);
     return { success: true, document: updated, isLive: false };
@@ -421,9 +505,10 @@ class ApiService {
   getLocalDocuments() {
     try {
       const saved = localStorage.getItem(CONFIG.STORAGE_KEY_DOCS);
-      return saved ? JSON.parse(saved) : [...INITIAL_DOCUMENTS];
+      const list = saved ? JSON.parse(saved) : [...INITIAL_DOCUMENTS];
+      return Array.isArray(list) ? list.map(d => this.normalizeDoc(d)) : [];
     } catch {
-      return [...INITIAL_DOCUMENTS];
+      return INITIAL_DOCUMENTS.map(d => this.normalizeDoc(d));
     }
   }
 

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   X, 
   Download, 
@@ -7,17 +7,12 @@ import {
   Check, 
   FileText, 
   FolderOpen,
-  AlertTriangle,
-  Info,
-  Calendar, 
-  Users,
-  Eye,
-  FileSpreadsheet,
-  FileCode
+  Info
 } from 'lucide-react';
 
 export default function PreviewModal({ document, onClose, onDownload, onCopyLink }) {
-  const [copied, setCopied] = React.useState(false);
+  const [copied, setCopied] = useState(false);
+  const [activeFileIndex, setActiveFileIndex] = useState(0);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -27,19 +22,46 @@ export default function PreviewModal({ document, onClose, onDownload, onCopyLink
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
+  useEffect(() => {
+    setActiveFileIndex(0);
+  }, [document]);
+
   if (!document) return null;
 
+  // Multi-file attachments list
+  const attachments = (document.attachments && Array.isArray(document.attachments) && document.attachments.length > 0)
+    ? document.attachments
+    : [{
+        name: document.fileName || document.title || 'เอกสารแนบ',
+        url: document.fileUrl || '',
+        downloadUrl: document.downloadUrl || document.fileUrl || '',
+        previewUrl: document.previewUrl || document.fileUrl || '',
+        size: document.fileSize || '',
+        type: document.fileType || 'FILE',
+        driveId: document.driveFileId || ''
+      }];
+
+  const currentFile = attachments[activeFileIndex] || attachments[0] || {};
+  const rawUrl = currentFile.previewUrl || currentFile.url || currentFile.downloadUrl || '';
+  const isDriveFolder = rawUrl.includes('/folders/') || rawUrl.includes('drive.google.com/drive/u/');
+
   const handleCopy = () => {
-    onCopyLink(document.fileUrl || document.downloadUrl);
+    onCopyLink(rawUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const rawUrl = document.previewUrl || document.fileUrl || document.downloadUrl || '';
-  const isDriveFolder = rawUrl.includes('/folders/') || rawUrl.includes('drive.google.com/drive/u/');
-  
+  const handleDownloadCurrent = () => {
+    onDownload({
+      ...document,
+      fileUrl: currentFile.url || currentFile.downloadUrl || rawUrl,
+      downloadUrl: currentFile.downloadUrl || currentFile.url || rawUrl,
+      title: currentFile.name || document.title
+    });
+  };
+
   // Extract Google Drive File ID if present
-  let driveId = document.driveFileId;
+  let driveId = currentFile.driveId;
   if (!driveId && rawUrl.includes('drive.google.com')) {
     const match = rawUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
     if (match) driveId = match[1];
@@ -75,16 +97,21 @@ export default function PreviewModal({ document, onClose, onDownload, onCopyLink
             <div className="overflow-hidden">
               <div className="flex items-center gap-2">
                 <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-teal-100 dark:bg-teal-900/60 text-teal-800 dark:text-teal-200 uppercase">
-                  {isDriveFolder ? 'GOOGLE DRIVE' : document.fileType}
+                  {currentFile.type || document.fileType}
                 </span>
                 {document.docNumber && document.docNumber !== '-' && (
                   <span className="text-xs font-mono font-medium text-slate-500">
                     {document.docNumber}
                   </span>
                 )}
+                {attachments.length > 1 && (
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                    {attachments.length} ไฟล์
+                  </span>
+                )}
               </div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-white truncate" title={document.title}>
-                {document.title}
+              <h2 className="text-base font-bold text-slate-900 dark:text-white truncate" title={currentFile.name || document.title}>
+                {currentFile.name || document.title}
               </h2>
             </div>
           </div>
@@ -92,7 +119,7 @@ export default function PreviewModal({ document, onClose, onDownload, onCopyLink
           {/* Header Action Buttons */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
-              onClick={() => onDownload(document)}
+              onClick={handleDownloadCurrent}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white shadow-sm transition-all active:scale-95"
             >
               <Download className="w-4 h-4" />
@@ -100,7 +127,7 @@ export default function PreviewModal({ document, onClose, onDownload, onCopyLink
             </button>
 
             <a
-              href={document.fileUrl || document.downloadUrl}
+              href={rawUrl}
               target="_blank"
               rel="noreferrer"
               className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700 flex items-center gap-1 text-xs font-semibold"
@@ -128,6 +155,31 @@ export default function PreviewModal({ document, onClose, onDownload, onCopyLink
           </div>
         </div>
 
+        {/* Multi-file tab selector (Requirement 1: ในอันเดียวใส่ได้มากกว่า 1 เอกสาร) */}
+        {attachments.length > 1 && (
+          <div className="bg-slate-100/90 dark:bg-slate-800/80 px-4 py-2 border-b border-slate-200 dark:border-slate-700/80 flex items-center gap-2 overflow-x-auto">
+            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap">
+              ไฟล์ในรายการนี้ ({attachments.length}):
+            </span>
+            {attachments.map((file, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setActiveFileIndex(idx)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-all ${
+                  activeFileIndex === idx
+                    ? 'bg-teal-600 text-white shadow-sm ring-2 ring-teal-500/30'
+                    : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 border border-slate-200 dark:border-slate-600'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span className="truncate max-w-[180px]">{file.name || `ไฟล์ที่ ${idx + 1}`}</span>
+                {file.size && <span className="opacity-75 text-[10px]">({file.size})</span>}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Notice Bar for Viewer */}
         <div className="bg-teal-50 dark:bg-teal-950/40 border-b border-teal-100 dark:border-teal-900/40 px-4 py-2 flex items-center justify-between text-[11px] text-teal-800 dark:text-teal-300">
           <div className="flex items-center gap-2 overflow-hidden truncate">
@@ -139,7 +191,7 @@ export default function PreviewModal({ document, onClose, onDownload, onCopyLink
             </span>
           </div>
           <a
-            href={document.fileUrl || document.downloadUrl}
+            href={rawUrl}
             target="_blank"
             rel="noreferrer"
             className="flex-shrink-0 font-bold underline hover:text-teal-950 dark:hover:text-white ml-2"
@@ -155,12 +207,12 @@ export default function PreviewModal({ document, onClose, onDownload, onCopyLink
           {embedUrl ? (
             <iframe
               src={embedUrl}
-              title={document.title}
+              title={currentFile.name || document.title}
               className="w-full h-full rounded-2xl border border-slate-300 dark:border-slate-800 bg-white shadow-inner"
               allow="autoplay"
             />
           ) : isDriveFolder ? (
-            /* Case 2: Folder Link (Never iframe a folder to avoid Google 403 error) */
+            /* Case 2: Folder Link */
             <div className="w-full h-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col items-center justify-center p-6 text-center">
               <div className="w-20 h-20 rounded-3xl bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 flex items-center justify-center mb-4 shadow-sm ring-4 ring-teal-500/10">
                 <FolderOpen className="w-10 h-10" />
@@ -169,16 +221,16 @@ export default function PreviewModal({ document, onClose, onDownload, onCopyLink
                 โฟลเดอร์ Google Drive รวม
               </span>
               <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-2 max-w-lg">
-                {document.title}
+                {currentFile.name || document.title}
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mb-6 leading-relaxed">
-                เอกสารนี้เชื่อมต่อกับโฟลเดอร์ Google Drive กลางของกลุ่มบริหารงานบุคคล (Google ไม่อนุญาตให้เปิดโฟลเดอร์แบบฝังในหน้าเว็บ) 
+                เอกสารนี้เชื่อมต่อกับโฟลเดอร์ Google Drive กลางของกลุ่มบริหารงานบุคคล
                 กรุณาคลิกปุ่มด้านล่างเพื่อเปิดโฟลเดอร์โดยตรง
               </p>
               
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <a
-                  href={document.fileUrl || document.downloadUrl}
+                  href={rawUrl}
                   target="_blank"
                   rel="noreferrer"
                   className="flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-teal-600/20 transition-all active:scale-95"
@@ -189,17 +241,13 @@ export default function PreviewModal({ document, onClose, onDownload, onCopyLink
                 </a>
 
                 <button
-                  onClick={() => onDownload(document)}
+                  onClick={handleDownloadCurrent}
                   className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs sm:text-sm transition-all"
                 >
                   <Download className="w-4 h-4" />
                   <span>ดาวน์โหลด / ลิงก์</span>
                 </button>
               </div>
-
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-6 max-w-sm">
-                💡 สำหรับแอดมิน: สามารถกดปุ่มแก้ไข (รูปดินสอ) เพื่ออัปโหลดไฟล์เอกสารตัวจริง (.pdf, .docx) จากคอมพิวเตอร์เพื่อแสดงตัวอย่างได้โดยตรง
-              </p>
             </div>
           ) : (
             /* Case 3: Other File Types without direct iframe */
@@ -208,21 +256,21 @@ export default function PreviewModal({ document, onClose, onDownload, onCopyLink
                 <FileText className="w-10 h-10" />
               </div>
               <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2 max-w-lg">
-                {document.title}
+                {currentFile.name || document.title}
               </h3>
               <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mb-6">
-                ไฟล์ประเภท {document.fileType} รองรับการดาวน์โหลดหรือเปิดผ่าน Google Drive / แอปพลิเคชันในเครื่องของคุณ
+                ไฟล์ประเภท {currentFile.type || document.fileType} รองรับการดาวน์โหลดหรือเปิดผ่าน Google Drive / แอปพลิเคชันในเครื่องของคุณ
               </p>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => onDownload(document)}
+                  onClick={handleDownloadCurrent}
                   className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm shadow-md shadow-teal-600/20 transition-all active:scale-95"
                 >
                   <Download className="w-4 h-4" />
                   <span>ดาวน์โหลดไฟล์ทันที</span>
                 </button>
                 <a
-                  href={document.fileUrl || document.downloadUrl}
+                  href={rawUrl}
                   target="_blank"
                   rel="noreferrer"
                   className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm transition-all"
@@ -240,7 +288,7 @@ export default function PreviewModal({ document, onClose, onDownload, onCopyLink
         <div className="px-6 py-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between text-xs text-slate-500 dark:text-slate-400 gap-2">
           <div className="flex items-center gap-4">
             <span>หมวดหมู่: <strong className="text-slate-700 dark:text-slate-300">{document.category}</strong></span>
-            <span>ขนาดไฟล์: <strong className="text-slate-700 dark:text-slate-300">{document.fileSize || '-'}</strong></span>
+            <span>ขนาดไฟล์: <strong className="text-slate-700 dark:text-slate-300">{currentFile.size || document.fileSize || '-'}</strong></span>
             <span>กลุ่มเป้าหมาย: <strong className="text-slate-700 dark:text-slate-300">{document.targetAudience}</strong></span>
           </div>
           <div>

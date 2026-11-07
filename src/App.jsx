@@ -179,18 +179,18 @@ export default function App() {
     setIsAddEditOpen(true);
   };
 
-  const handleSaveDoc = async (formData, fileBlob) => {
+  const handleSaveDoc = async (formData, newFiles = [], existingFiles = []) => {
     if (editingDoc) {
       await apiService.updateDocument({
         ...editingDoc,
         ...formData
-      }, fileBlob);
-      showToast('แก้ไขข้อมูลเอกสารเรียบร้อย', 'success');
+      }, newFiles, existingFiles);
+      showToast('บันทึกและอัปเดตเอกสารเรียบร้อย', 'success');
       loadDocs();
     } else {
-      await apiService.addDocument(formData, fileBlob);
+      await apiService.addDocument(formData, newFiles);
       confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
-      showToast('เพิ่มเอกสารใหม่สำเร็จ', 'success');
+      showToast('เพิ่มเอกสารและอัปโหลดไฟล์สำเร็จ', 'success');
       loadDocs();
     }
   };

@@ -217,6 +217,13 @@ export default function DocumentGrid({
                 {doc.fileType}
               </span>
 
+              {/* Multi-file badge */}
+              {doc.attachments && doc.attachments.length > 1 && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                  +{doc.attachments.length} ไฟล์
+                </span>
+              )}
+
               {/* Doc Number */}
               {doc.docNumber && doc.docNumber !== '-' && (
                 <span className="px-2 py-0.5 rounded-lg text-[10px] font-mono font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
