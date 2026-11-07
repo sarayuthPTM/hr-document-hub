@@ -27,20 +27,36 @@ class ApiService {
     };
   }
 
-  saveSettings(newSettings) {
+  async saveSettings(newSettings) {
     this.settings = { ...this.settings, ...newSettings };
     localStorage.setItem(CONFIG.STORAGE_KEY_SETTINGS, JSON.stringify(this.settings));
+
+    // Two-way sync: ส่งค่าไปอัปเดตลง Google Sheet ในแท็บ 'ตั้งค่าระบบ'
+    if (this.settings.gasUrl && this.settings.gasUrl.trim() !== '') {
+      try {
+        fetch(this.settings.gasUrl.trim(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'updateSettings',
+            settings: this.settings
+          })
+        }).catch(err => console.warn('Sync settings to Sheet failed:', err));
+      } catch (e) {
+        console.warn('Sync settings error:', e);
+      }
+    }
+
     return this.settings;
   }
 
-  // Load all documents
+  // Load all documents + Sync live settings from Sheet
   async getDocuments() {
-    // If Google Apps Script Web App URL is configured, try live fetch
     if (this.settings.gasUrl && this.settings.gasUrl.trim() !== '') {
       try {
         const url = new URL(this.settings.gasUrl.trim());
         url.searchParams.set('action', 'getDocuments');
-        url.searchParams.set('_t', Date.now().toString()); // Cache buster
+        url.searchParams.set('_t', Date.now().toString());
 
         const response = await fetch(url.toString(), {
           method: 'GET',
@@ -49,14 +65,22 @@ class ApiService {
 
         if (response.ok) {
           const resJson = await response.json();
-          if (resJson.success && Array.isArray(resJson.data)) {
-            // Cache to localStorage
-            localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(resJson.data));
-            return {
-              data: resJson.data,
-              isLive: true,
-              message: 'ดึงข้อมูลสดจาก Google Sheet สำเร็จ'
-            };
+          if (resJson.success) {
+            // ซิงก์การตั้งค่าและรหัสผ่านล่าสุดจาก Google Sheet
+            if (resJson.settings && typeof resJson.settings === 'object') {
+              this.settings = { ...this.settings, ...resJson.settings };
+              localStorage.setItem(CONFIG.STORAGE_KEY_SETTINGS, JSON.stringify(this.settings));
+            }
+
+            if (Array.isArray(resJson.data)) {
+              localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(resJson.data));
+              return {
+                data: resJson.data,
+                settings: this.settings,
+                isLive: true,
+                message: 'ดึงข้อมูลสดจาก Google Sheet สำเร็จ'
+              };
+            }
           }
         }
       } catch (err) {
@@ -70,19 +94,18 @@ class ApiService {
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return { data: parsed, isLive: false, message: 'แสดงข้อมูลจากความจำเครื่อง (ออฟไลน์)' };
+          return { data: parsed, settings: this.settings, isLive: false, message: 'แสดงข้อมูลจากความจำเครื่อง (ออฟไลน์)' };
         }
       }
     } catch (e) {
       console.error('Local cache read error:', e);
     }
 
-    // Default Seed
     localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(INITIAL_DOCUMENTS));
-    return { data: INITIAL_DOCUMENTS, isLive: false, message: 'แสดงข้อมูลตัวอย่างเริ่มต้น' };
+    return { data: INITIAL_DOCUMENTS, settings: this.settings, isLive: false, message: 'แสดงข้อมูลตัวอย่างเริ่มต้น' };
   }
 
-  // Add Document (Direct upload or link)
+  // Add Document
   async addDocument(docData, fileBlob = null) {
     const isLive = Boolean(this.settings.gasUrl && this.settings.gasUrl.trim());
 
@@ -90,7 +113,6 @@ class ApiService {
       try {
         let payload = {};
         if (fileBlob) {
-          // Convert file to Base64
           const base64 = await this.fileToBase64(fileBlob);
           payload = {
             action: 'uploadFile',
@@ -108,13 +130,12 @@ class ApiService {
 
         const response = await fetch(this.settings.gasUrl.trim(), {
           method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // GAS expects plain text to avoid CORS preflight issues
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(payload)
         });
 
         const result = await response.json();
         if (result.success && result.document) {
-          // Also update local cache
           const currentDocs = this.getLocalDocuments();
           currentDocs.unshift(result.document);
           localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(currentDocs));
@@ -184,7 +205,6 @@ class ApiService {
       }
     }
 
-    // Local update
     this.updateLocalDocument(docData);
     return { success: true, isLive: false };
   }
@@ -216,7 +236,6 @@ class ApiService {
       }
     }
 
-    // Local delete
     this.deleteLocalDocument(id);
     return { success: true, isLive: false };
   }
@@ -293,7 +312,7 @@ class ApiService {
   async initSheet(urlToUse) {
     const targetUrl = urlToUse || this.settings.gasUrl;
     if (!targetUrl) {
-      throw new Error('กรุณาระบุ URL ของ Google Apps Script Web App ก่อนสั่งสร้างตาราง');
+      throw new Error('กรุณาระบุ URL ของ Google Apps Script Web App');
     }
 
     const res = await fetch(targetUrl.trim(), {
@@ -306,7 +325,7 @@ class ApiService {
     return data;
   }
 
-  // Export current documents to Excel (.xlsx)
+  // Export current documents to Excel
   exportToExcel(documents) {
     const exportData = documents.map((doc, idx) => ({
       'ลำดับ': idx + 1,
@@ -328,25 +347,6 @@ class ApiService {
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'เอกสารงานบุคคล');
-
-    // Auto col width
-    const max_width = exportData.reduce((w, r) => Math.max(w, (r['ชื่อเอกสาร'] || '').length), 10);
-    worksheet['!cols'] = [
-      { wch: 6 },
-      { wch: 18 },
-      { wch: 14 },
-      { wch: Math.min(max_width + 4, 50) },
-      { wch: 25 },
-      { wch: 10 },
-      { wch: 18 },
-      { wch: 14 },
-      { wch: 20 },
-      { wch: 30 },
-      { wch: 10 },
-      { wch: 12 },
-      { wch: 40 },
-      { wch: 18 }
-    ];
 
     const fileName = `KBS_HR_Documents_${new Date().toISOString().slice(0, 10)}.xlsx`;
     XLSX.writeFile(workbook, fileName);

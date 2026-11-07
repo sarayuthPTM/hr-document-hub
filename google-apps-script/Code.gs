@@ -11,18 +11,49 @@
 const CONFIG = {
   SHEET_ID: '1i_1vctvE4Si6ylObH24ipOyTz2uSY6kXMKGNpd2N5WY',
   DRIVE_FOLDER_ID: '1mKdJUgQ9iEnVsJw-DeWV_NRnkAQsBsAt',
-  // รองรับทั้งชื่อ 'ข้อมูล' (ที่ผู้ใช้สร้างไว้) หรือ 'เอกสารงานบุคคล'
   PRIMARY_SHEET_NAMES: ['ข้อมูล', 'เอกสารงานบุคคล', 'Sheet1'],
-  TIMEZONE: 'Asia/Bangkok'
+  SETTINGS_SHEET_NAME: 'ตั้งค่าระบบ',
+  TIMEZONE: 'Asia/Bangkok',
+  DEFAULT_PIN: '2725'
 };
 
-// Helper: ค้นหา Sheet แผ่นงานข้อมูล
+// Helper: ค้นหา Sheet แผ่นงานข้อมูลเอกสาร
 function getTargetSheet(ss) {
   for (let name of CONFIG.PRIMARY_SHEET_NAMES) {
     const s = ss.getSheetByName(name);
     if (s) return s;
   }
   return ss.getSheets()[0];
+}
+
+// Helper: ค้นหาหรือสร้าง Sheet แผ่นงานตั้งค่าระบบ
+function getOrCreateSettingsSheet(ss) {
+  let s = ss.getSheetByName(CONFIG.SETTINGS_SHEET_NAME);
+  if (!s) {
+    s = ss.insertSheet(CONFIG.SETTINGS_SHEET_NAME);
+    const headers = ['key', 'value', 'description', 'updatedAt'];
+    s.getRange(1, 1, 1, headers.length).setValues([headers]);
+    
+    // Header style: กรมท่า สวยงาม
+    const headerRange = s.getRange(1, 1, 1, headers.length);
+    headerRange.setBackground('#1e293b');
+    headerRange.setFontColor('#ffffff');
+    headerRange.setFontWeight('bold');
+    s.setFrozenRows(1);
+
+    // Initial settings rows
+    const initData = [
+      ['adminPin', CONFIG.DEFAULT_PIN, 'รหัสผ่านเข้าสู่ระบบผู้ดูแลระบบ (Admin PIN)', new Date().toLocaleString('th-TH')],
+      ['appNameTh', 'KBS HR Hub', 'ชื่อระบบ (ภาษาไทย)', new Date().toLocaleString('th-TH')],
+      ['appNameEn', 'HR Document Hub', 'ชื่อระบบ (ภาษาอังกฤษ)', new Date().toLocaleString('th-TH')],
+      ['schoolName', 'โรงเรียนกาญจนาภิเษกวิทยาลัย กระบี่', 'ชื่อสถานศึกษา', new Date().toLocaleString('th-TH')],
+      ['departmentName', 'กลุ่มบริหารงานบุคคล', 'ชื่อกลุ่มงาน / ฝ่าย', new Date().toLocaleString('th-TH')],
+      ['developer', 'พัฒนาโดย ว่าที่ ร.ต. ศรายุทธ พงค์ทองเมือง', 'ข้อมูลลิขสิทธิ์ / ผู้พัฒนา', new Date().toLocaleString('th-TH')],
+      ['tagline', 'พัฒนาระบบเพื่อการบริหารงานบุคคลที่มีประสิทธิภาพ', 'สโลแกนท้ายเว็บ', new Date().toLocaleString('th-TH')]
+    ];
+    s.getRange(2, 1, initData.length, headers.length).setValues(initData);
+  }
+  return s;
 }
 
 // Response Helper with CORS
@@ -55,12 +86,22 @@ function doGet(e) {
       return jsonResponse(result);
     }
 
+    if (action === 'getSettings') {
+      const settings = readSettingsFromSheet();
+      return jsonResponse({
+        success: true,
+        settings: settings
+      });
+    }
+
     if (action === 'getDocuments') {
       const docs = getAllDocuments();
+      const settings = readSettingsFromSheet();
       return jsonResponse({
         success: true,
         data: docs,
-        total: docs.length
+        total: docs.length,
+        settings: settings // ส่งรหัสผ่านและการตั้งค่าล่าสุดกลับไปด้วยเสมอ
       });
     }
 
@@ -78,7 +119,7 @@ function doGet(e) {
 }
 
 /**
- * 2. POST Request Handler (Add, Upload, Update, Delete)
+ * 2. POST Request Handler
  */
 function doPost(e) {
   try {
@@ -119,6 +160,11 @@ function doPost(e) {
       return jsonResponse(handleIncrementCount(payload.id, 'viewCount'));
     }
 
+    // อัปเดตรหัสผ่านหรือการตั้งค่าลง Google Sheet
+    if (action === 'updateSettings') {
+      return jsonResponse(saveSettingsToSheet(payload.settings));
+    }
+
     if (action === 'initSheet') {
       return jsonResponse(initDatabaseSheet());
     }
@@ -137,13 +183,87 @@ function doPost(e) {
 }
 
 /**
+ * อ่านการตั้งค่าและรหัสผ่านจากแผ่นงาน 'ตั้งค่าระบบ'
+ */
+function readSettingsFromSheet() {
+  try {
+    const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+    const sheet = getOrCreateSettingsSheet(ss);
+    const values = sheet.getDataRange().getValues();
+    const settings = {};
+
+    for (let i = 1; i < values.length; i++) {
+      const key = String(values[i][0]).trim();
+      const val = values[i][1];
+      if (key) {
+        settings[key] = String(val !== undefined && val !== null ? val : '');
+      }
+    }
+
+    // หากรหัสผ่านว่างในชีต ให้ใช้ DEFAULT_PIN
+    if (!settings.adminPin || settings.adminPin.trim() === '') {
+      settings.adminPin = CONFIG.DEFAULT_PIN;
+    }
+
+    return settings;
+  } catch (err) {
+    Logger.log('Read settings error: ' + err.toString());
+    return { adminPin: CONFIG.DEFAULT_PIN };
+  }
+}
+
+/**
+ * บันทึกการตั้งค่าและรหัสผ่านลงแผ่นงาน 'ตั้งค่าระบบ' ใน Google Sheet
+ */
+function saveSettingsToSheet(newSettings) {
+  try {
+    if (!newSettings) return { success: false, message: 'ไม่มีข้อมูลการตั้งค่า' };
+
+    const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+    const sheet = getOrCreateSettingsSheet(ss);
+    const values = sheet.getDataRange().getValues();
+    const nowStr = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'dd/MM/yyyy HH:mm:ss');
+
+    const keyRowMap = {};
+    for (let i = 1; i < values.length; i++) {
+      keyRowMap[String(values[i][0]).trim()] = i + 1; // 1-based index
+    }
+
+    // วนลูปอัปเดตแต่ละ key
+    Object.keys(newSettings).forEach(key => {
+      if (['gasUrl', 'sheetId', 'driveFolderId'].includes(key)) return; // ข้ามฟิลด์เชื่อมต่อระบบ
+      
+      const val = newSettings[key] !== undefined ? String(newSettings[key]) : '';
+      if (keyRowMap[key]) {
+        // อัปเดตแถวเดิม
+        const row = keyRowMap[key];
+        sheet.getRange(row, 2).setValue(val);
+        sheet.getRange(row, 4).setValue(nowStr);
+      } else {
+        // เพิ่มแถวใหม่
+        sheet.appendRow([key, val, 'การตั้งค่าระบบ ' + key, nowStr]);
+      }
+    });
+
+    return {
+      success: true,
+      message: 'อัปเดตรหัสผ่านและการตั้งค่าลงใน Google Sheet เรียบร้อยแล้ว!'
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: 'Save settings error: ' + err.toString()
+    };
+  }
+}
+
+/**
  * 3. Handle File Upload directly to Google Drive Folder
  */
 function handleFileUpload(data) {
   try {
     const folder = DriveApp.getFolderById(CONFIG.DRIVE_FOLDER_ID);
     
-    // Decode Base64 data
     const base64Data = data.fileData.includes('base64,') 
       ? data.fileData.split('base64,')[1] 
       : data.fileData;
@@ -154,10 +274,7 @@ function handleFileUpload(data) {
       data.fileName || 'document.pdf'
     );
 
-    // Save to Google Drive
     const driveFile = folder.createFile(decodedBlob);
-    
-    // Set file sharing permission to anyone with link can view
     try {
       driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     } catch(shareErr) {
@@ -170,7 +287,6 @@ function handleFileUpload(data) {
     const previewUrl = 'https://drive.google.com/file/d/' + driveFileId + '/preview';
     const fileSizeFormatted = formatBytes(driveFile.getSize());
 
-    // Prepare Document Record
     const newDoc = {
       id: 'DOC-' + Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'yyyyMMdd-HHmmss'),
       title: data.title || data.fileName,
@@ -195,7 +311,6 @@ function handleFileUpload(data) {
       uploadedBy: data.uploadedBy || 'Admin'
     };
 
-    // Insert into Google Sheet
     appendDocumentToSheet(newDoc);
 
     return {
@@ -213,7 +328,7 @@ function handleFileUpload(data) {
 }
 
 /**
- * 4. Handle Add Document without file upload (External / Existing link)
+ * 4. Handle Add Document without file upload
  */
 function handleAddDocument(data) {
   try {
@@ -442,7 +557,7 @@ function appendDocumentToSheet(doc) {
 }
 
 /**
- * 9. Initializer: Auto Create Headers & Starter Data in Blank Sheet
+ * 9. Initializer: Auto Create Headers in Blank Sheet
  */
 function initDatabaseSheet() {
   const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
@@ -460,136 +575,21 @@ function initDatabaseSheet() {
     'createdAt', 'updatedAt', 'uploadedBy'
   ];
 
-  // Set Headers at row 1
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   
-  // Format Header row: เขียวมรกต + ตัวหนา + จัดกึ่งกลาง
   const headerRange = sheet.getRange(1, 1, 1, headers.length);
-  headerRange.setBackground('#0d9488'); // Emerald / Teal
+  headerRange.setBackground('#0d9488');
   headerRange.setFontColor('#ffffff');
   headerRange.setFontWeight('bold');
   headerRange.setHorizontalAlignment('center');
   sheet.setFrozenRows(1);
 
-  // If table is newly created, add standard HR Documents
-  if (sheet.getLastRow() <= 1) {
-    const starterDocs = [
-      [
-        'DOC-2026-001', 
-        'แบบฟอร์มใบลาป่วย ลากิจส่วนตัว และลาคลอดบุตร (ฉบับปรับปรุง 2568)', 
-        'กบค.01/2568', 
-        'แบบฟอร์มใบลาและขออนุญาต', 
-        'PDF', 
-        'https://drive.google.com/drive/folders/' + CONFIG.DRIVE_FOLDER_ID,
-        'https://drive.google.com/drive/folders/' + CONFIG.DRIVE_FOLDER_ID,
-        'https://drive.google.com/drive/folders/' + CONFIG.DRIVE_FOLDER_ID,
-        '',
-        '342 KB',
-        'บุคลากรทุกคน',
-        '2568',
-        'ใบลา, ลาป่วย, ลากิจ, แบบฟอร์ม',
-        'แบบคำขออนุญาตลาป่วย ลากิจส่วนตัว ตามระเบียบสำนักนายกรัฐมนตรี',
-        142, 380, true, 'active',
-        '01/01/2568 09:00', '01/01/2568 09:00', 'Admin'
-      ],
-      [
-        'DOC-2026-002', 
-        'แบบฟอร์มข้อตกลงในการพัฒนางาน (PA) สำหรับข้าราชการครู ตำแหน่งครู (แบบ วPA 1/ส)', 
-        'วPA 1/ส-2568', 
-        'การประเมินผลการปฏิบัติงาน (PA)', 
-        'DOCX', 
-        'https://drive.google.com/drive/folders/' + CONFIG.DRIVE_FOLDER_ID,
-        'https://drive.google.com/drive/folders/' + CONFIG.DRIVE_FOLDER_ID,
-        'https://drive.google.com/drive/folders/' + CONFIG.DRIVE_FOLDER_ID,
-        '',
-        '1.1 MB',
-        'ข้าราชการครู',
-        '2568',
-        'PA, ข้อตกลง, วPA, ประเมิน, ว9',
-        'แบบจัดทำข้อตกลงในการพัฒนางาน (Performance Agreement) รอบปีงบประมาณ 2568',
-        235, 510, true, 'active',
-        '02/01/2568 10:30', '02/01/2568 10:30', 'Admin'
-      ],
-      [
-        'DOC-2026-003', 
-        'คำสั่งแต่งตั้งเวรยามและผู้รักษาการณ์ดูแลรักษาความปลอดภัยสถานที่ราชการ', 
-        'คส.045/2568', 
-        'คำสั่งและประกาศงานบุคคล', 
-        'PDF', 
-        'https://drive.google.com/drive/folders/' + CONFIG.DRIVE_FOLDER_ID,
-        'https://drive.google.com/drive/folders/' + CONFIG.DRIVE_FOLDER_ID,
-        'https://drive.google.com/drive/folders/' + CONFIG.DRIVE_FOLDER_ID,
-        '',
-        '850 KB',
-        'บุคลากรทุกคน',
-        '2568',
-        'เวรยาม, คำสั่ง, ปลอดภัย, รักษาการณ์',
-        'คำสั่งโรงเรียนกาญจนาภิเษกวิทยาลัย กระบี่ เรื่อง การอยู่เวรรักษาการณ์สถานที่ราชการ',
-        98, 220, false, 'active',
-        '05/01/2568 14:15', '05/01/2568 14:15', 'Admin'
-      ],
-      [
-        'DOC-2026-004', 
-        'แบบคำขอหนังสือรับรองเงินเดือนและหนังสือรับรองการปฏิบัติงาน', 
-        'กบค.08/2568', 
-        'หนังสือรับรองและแบบคำขอทั่วไป', 
-        'DOCX', 
-        'https://drive.google.com/drive/folders/' + CONFIG.DRIVE_FOLDER_ID,
-        'https://drive.google.com/drive/folders/' + CONFIG.DRIVE_FOLDER_ID,
-        'https://drive.google.com/drive/folders/' + CONFIG.DRIVE_FOLDER_ID,
-        '',
-        '180 KB',
-        'บุคลากรทุกคน',
-        '2568',
-        'หนังสือรับรอง, เงินเดือน, การทำงาน, ยื่นกู้',
-        'แบบฟอร์มขอให้ออกหนังสือรับรองเพื่อใช้ประกอบการยื่นกู้หรือทำธุรกรรม',
-        189, 410, false, 'active',
-        '10/01/2568 11:20', '10/01/2568 11:20', 'Admin'
-      ],
-      [
-        'DOC-2026-005', 
-        'คู่มือและเกณฑ์การเลื่อนเงินเดือนข้าราชการครูและบุคลากรทางการศึกษา', 
-        'คม.02/2568', 
-        'เลื่อนขั้นเงินเดือนและวิทยฐานะ', 
-        'PDF', 
-        'https://drive.google.com/drive/folders/' + CONFIG.DRIVE_FOLDER_ID,
-        'https://drive.google.com/drive/folders/' + CONFIG.DRIVE_FOLDER_ID,
-        'https://drive.google.com/drive/folders/' + CONFIG.DRIVE_FOLDER_ID,
-        '',
-        '2.4 MB',
-        'ข้าราชการครู',
-        '2568',
-        'เลื่อนเงินเดือน, ฐานเงินเดือน, วิทยฐานะ, ก.ค.ศ.',
-        'แนวปฏิบัติและเกณฑ์การคำนวณร้อยละการเลื่อนเงินเดือน รอบที่ 1 และ 2',
-        156, 340, true, 'active',
-        '15/01/2568 16:00', '15/01/2568 16:00', 'Admin'
-      ],
-      [
-        'DOC-2026-006', 
-        'แบบฟอร์มขออนุญาตไปราชการและเข้ารับการอบรมพัฒนาวิชาชีพ', 
-        'กบค.03/2568', 
-        'แบบฟอร์มใบลาและขออนุญาต', 
-        'PDF', 
-        'https://drive.google.com/drive/folders/' + CONFIG.DRIVE_FOLDER_ID,
-        'https://drive.google.com/drive/folders/' + CONFIG.DRIVE_FOLDER_ID,
-        'https://drive.google.com/drive/folders/' + CONFIG.DRIVE_FOLDER_ID,
-        '',
-        '275 KB',
-        'บุคลากรทุกคน',
-        '2568',
-        'ไปราชการ, อบรม, สัมมนา, ขออนุมัติ',
-        'แบบขออนุมัติเดินทางไปราชการ อบรม สัมมนา หรือศึกษาดูงานภายนอกสถานศึกษา',
-        210, 490, false, 'active',
-        '18/01/2568 08:45', '18/01/2568 08:45', 'Admin'
-      ]
-    ];
-
-    sheet.getRange(2, 1, starterDocs.length, headers.length).setValues(starterDocs);
-  }
+  // สร้างชีตตั้งค่าระบบคู่กันไปด้วย
+  getOrCreateSettingsSheet(ss);
 
   return {
     success: true,
-    message: 'สร้างโครงสร้างตารางและข้อมูลเริ่มต้นใน Google Sheet สำเร็จเรียบร้อย!'
+    message: 'สร้างโครงสร้างตารางและแผ่นงานตั้งค่าระบบสำเร็จเรียบร้อย!'
   };
 }
 

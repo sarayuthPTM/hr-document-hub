@@ -102,6 +102,9 @@ export default function App() {
     try {
       const res = await apiService.getDocuments();
       setDocuments(res.data);
+      if (res.settings) {
+        setSettings(prev => ({ ...prev, ...res.settings }));
+      }
       setIsLive(res.isLive);
     } catch (err) {
       console.error(err);
@@ -227,10 +230,10 @@ export default function App() {
   };
 
   // Settings Handlers
-  const handleSaveSettings = (newSettings) => {
-    const saved = apiService.saveSettings(newSettings);
+  const handleSaveSettings = async (newSettings) => {
+    const saved = await apiService.saveSettings(newSettings);
     setSettings(saved);
-    showToast('บันทึกการตั้งค่าและข้อมูลระบบเรียบร้อยแล้ว', 'success');
+    showToast('บันทึกการตั้งค่าและซิงก์ลง Google Sheet แล้ว', 'success');
     loadDocs();
   };
 
