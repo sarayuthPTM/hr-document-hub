@@ -153,11 +153,25 @@ class ApiService {
           previewUrl: doc.previewUrl || doc.fileUrl,
           size: doc.fileSize || '',
           type: doc.fileType || 'FILE',
-          driveId: doc.driveFileId || ''
+          driveId: doc.driveFileId || this.extractDriveFileId(doc.fileUrl)
         }];
       } else {
         attachments = [];
       }
+    } else {
+      attachments = attachments.map((att, idx) => {
+        const rawUrl = att.url || att.downloadUrl || att.previewUrl || '';
+        const driveId = att.driveId || this.extractDriveFileId(rawUrl);
+        return {
+          name: att.name || doc.fileName || `${doc.title || 'เอกสาร'} (${idx + 1})`,
+          url: att.url || rawUrl,
+          downloadUrl: att.downloadUrl || (driveId ? `https://drive.google.com/uc?export=download&id=${driveId}` : rawUrl),
+          previewUrl: att.previewUrl || (driveId ? `https://drive.google.com/file/d/${driveId}/preview` : rawUrl),
+          size: att.size || '',
+          type: String(att.type || this.detectFileType(att.name || rawUrl)).toUpperCase(),
+          driveId
+        };
+      });
     }
     return {
       ...doc,
@@ -165,48 +179,58 @@ class ApiService {
     };
   }
 
+  // Extract Google Drive file ID from URL
+  extractDriveFileId(url) {
+    if (!url || typeof url !== 'string' || !url.includes('drive.google.com') && !url.includes('docs.google.com')) {
+      return '';
+    }
+    if (url.includes('/folders/')) return '';
+    const pathMatch = url.match(/\/(?:file\/d|document\/d|spreadsheets\/d|presentation\/d)\/([a-zA-Z0-9_-]+)/);
+    if (pathMatch) return pathMatch[1];
+    const idMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    return idMatch ? idMatch[1] : '';
+  }
+
   // Helper: Upload a single file to Drive via live GAS endpoint
   async uploadFileToDrive(fileBlob, title = '') {
     const isLive = Boolean(this.settings.gasUrl && this.settings.gasUrl.trim());
     if (isLive) {
-      try {
-        const base64 = await this.fileToBase64(fileBlob);
-        const res = await fetch(this.settings.gasUrl.trim(), {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({
-            action: 'uploadFile',
-            fileName: fileBlob.name,
-            fileData: base64,
-            mimeType: fileBlob.type || 'application/octet-stream',
-            title: title || fileBlob.name
-          })
-        });
+      const base64 = await this.fileToBase64(fileBlob);
+      const res = await fetch(this.settings.gasUrl.trim(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'uploadFile',
+          fileName: fileBlob.name,
+          fileData: base64,
+          mimeType: fileBlob.type || 'application/octet-stream',
+          title: title || fileBlob.name,
+          skipSheetWrite: true
+        })
+      });
 
-        const data = await res.json();
-        if (data.success && data.document) {
-          // Clean up the temporary row created by uploadFile
-          if (data.document.id) {
-            fetch(this.settings.gasUrl.trim(), {
-              method: 'POST',
-              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-              body: JSON.stringify({ action: 'deleteDoc', id: data.document.id })
-            }).catch(() => {});
-          }
-
-          return {
-            name: fileBlob.name,
-            url: data.document.fileUrl,
-            downloadUrl: data.document.downloadUrl,
-            previewUrl: data.document.previewUrl,
-            driveId: data.document.driveFileId,
-            size: data.document.fileSize || this.formatBytes(fileBlob.size),
-            type: data.document.fileType || this.detectFileType(fileBlob.name)
-          };
+      const data = await res.json();
+      if (data.success && data.document) {
+        // Clean up temporary row if older GAS deployment created one
+        if (data.document.id) {
+          fetch(this.settings.gasUrl.trim(), {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'deleteDoc', id: data.document.id })
+          }).catch(() => {});
         }
-      } catch (err) {
-        console.warn('Upload file to Drive error:', err);
+
+        return {
+          name: fileBlob.name,
+          url: data.document.fileUrl,
+          downloadUrl: data.document.downloadUrl,
+          previewUrl: data.document.previewUrl,
+          driveId: data.document.driveFileId,
+          size: data.document.fileSize || this.formatBytes(fileBlob.size),
+          type: data.document.fileType || this.detectFileType(fileBlob.name)
+        };
       }
+      throw new Error(data.error || data.message || `อัปโหลดไฟล์ "${fileBlob.name}" ไม่สำเร็จ`);
     }
 
     // Local / Offline fallback
@@ -313,7 +337,7 @@ class ApiService {
   }
 
   // Update existing document (รองรับหลายไฟล์ + แสดงข้อมูลไฟล์เดิมชัดเจน)
-  async updateDocument(docData, newFiles = [], existingFiles = []) {
+  async updateDocument(docData, newFiles = [], existingFiles = null) {
     const filesArray = Array.isArray(newFiles) ? newFiles : (newFiles ? [newFiles] : []);
     const isLive = Boolean(this.settings.gasUrl && this.settings.gasUrl.trim());
 
@@ -325,7 +349,11 @@ class ApiService {
       }
     }
 
-    const allAttachments = [...(existingFiles || []), ...uploadedAttachments];
+    // Preserve existing attachments when caller only updates metadata (e.g. handleTogglePin)
+    const baseExisting = Array.isArray(existingFiles)
+      ? existingFiles
+      : (Array.isArray(docData.attachments) ? docData.attachments : []);
+    const allAttachments = [...baseExisting, ...uploadedAttachments];
     const updatedFields = { ...docData };
 
     if (allAttachments.length > 0) {
@@ -338,6 +366,8 @@ class ApiService {
       updatedFields.fileType = primary.type;
       updatedFields.fileName = primary.name;
       updatedFields.attachments = allAttachments;
+    } else if (Array.isArray(existingFiles)) {
+      updatedFields.attachments = [];
     }
 
     if (isLive) {
@@ -569,6 +599,60 @@ class ApiService {
     if (['ZIP', 'RAR', '7Z'].includes(ext)) return 'ZIP';
     if (['JPG', 'JPEG', 'PNG', 'WEBP'].includes(ext)) return 'IMAGE';
     return 'PDF';
+  }
+
+  /**
+   * Download a single file cleanly (uses CORS-enabled direct blob download for Drive files to preserve filenames and avoid popup blocks, with _blank fallback).
+   */
+  async downloadSingleFile(file) {
+    if (!file) return;
+    const rawUrl = file.downloadUrl || file.url || file.fileUrl || '';
+    const isNativeDocsEditor = /docs\.google\.com\/(document|spreadsheets|presentation)\/d\//.test(rawUrl);
+    const driveId = file.driveId || file.driveFileId || this.extractDriveFileId(rawUrl);
+    const fileName = file.name || file.fileName || file.title || 'document';
+
+    if (driveId && !isNativeDocsEditor) {
+      try {
+        const directUrl = `https://drive.usercontent.google.com/download?id=${driveId}&export=download`;
+        const res = await fetch(directUrl);
+        const contentType = (res.headers.get('content-type') || '').toLowerCase();
+        if (res.ok && !contentType.includes('text/html')) {
+          const blob = await res.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          const link = window.document.createElement('a');
+          link.href = blobUrl;
+          link.download = fileName;
+          window.document.body.appendChild(link);
+          link.click();
+          window.document.body.removeChild(link);
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 4000);
+          return;
+        }
+      } catch (err) {
+        console.warn('Direct Drive blob download failed, falling back to tab open:', err);
+      }
+    }
+
+    const fallbackUrl = rawUrl || (driveId ? `https://drive.google.com/uc?export=download&id=${driveId}` : '');
+    if (fallbackUrl) {
+      window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+    }
+  }
+
+  /**
+   * Download multiple attached files sequentially as individual files (no ZIP extraction needed).
+   */
+  async downloadMultipleFiles(files = [], onProgress = null) {
+    const list = Array.isArray(files) ? files.filter(Boolean) : [];
+    for (let i = 0; i < list.length; i++) {
+      if (typeof onProgress === 'function') {
+        onProgress(i + 1, list.length, list[i]);
+      }
+      await this.downloadSingleFile(list[i]);
+      if (i < list.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 350));
+      }
+    }
   }
 
   formatBytes(bytes) {

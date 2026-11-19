@@ -11,6 +11,7 @@ import {
   Trash2, 
   ExternalLink 
 } from 'lucide-react';
+import { getFileTypeConfig, getDocumentFileTypes } from '../utils/fileTypeConfig';
 
 export default function DocumentTable({ 
   documents, 
@@ -94,9 +95,21 @@ export default function DocumentTable({
 
                 {/* File Type */}
                 <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                  <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                    {doc.fileType}
-                  </span>
+                  <div className="inline-flex items-center justify-center gap-1 flex-wrap">
+                    {getDocumentFileTypes(doc).map((ftype) => {
+                      const conf = getFileTypeConfig(ftype);
+                      return (
+                        <span key={ftype} className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${conf.badge}`}>
+                          {conf.label}
+                        </span>
+                      );
+                    })}
+                    {doc.attachments && doc.attachments.length > 1 && (
+                      <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                        {doc.attachments.length} ไฟล์
+                      </span>
+                    )}
+                  </div>
                 </td>
 
                 {/* Target Audience */}
@@ -127,7 +140,7 @@ export default function DocumentTable({
                     <button
                       onClick={() => onDownload(doc)}
                       className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                      title="ดาวน์โหลดไฟล์"
+                      title={doc.attachments && doc.attachments.length > 1 ? `เลือกดาวน์โหลด (${doc.attachments.length} ไฟล์)` : 'ดาวน์โหลดไฟล์'}
                     >
                       <Download className="w-4 h-4" />
                     </button>

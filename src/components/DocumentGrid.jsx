@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react';
 import { 
-  FileText, 
   Download, 
   Eye, 
   Copy, 
@@ -9,9 +8,6 @@ import {
   Trash2, 
   Edit3, 
   Users, 
-  FileSpreadsheet, 
-  File, 
-  Archive,
   QrCode,
   Flame,
   ChevronLeft,
@@ -20,33 +16,7 @@ import {
   GripVertical,
   FolderOpen
 } from 'lucide-react';
-
-const FILE_TYPE_CONFIG = {
-  PDF: {
-    badge: 'bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800',
-    icon: FileText
-  },
-  DOCX: {
-    badge: 'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
-    icon: FileText
-  },
-  XLSX: {
-    badge: 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
-    icon: FileSpreadsheet
-  },
-  PPTX: {
-    badge: 'bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
-    icon: FileText
-  },
-  ZIP: {
-    badge: 'bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
-    icon: Archive
-  },
-  DEFAULT: {
-    badge: 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700',
-    icon: File
-  }
-};
+import { getFileTypeConfig, getDocumentFileTypes } from '../utils/fileTypeConfig';
 
 export default function DocumentGrid({ 
   documents, 
@@ -176,8 +146,8 @@ export default function DocumentGrid({
 
   // Render Card Component
   const renderCard = (doc, idx) => {
-    const fileConf = FILE_TYPE_CONFIG[doc.fileType] || FILE_TYPE_CONFIG.DEFAULT;
-    const IconComponent = fileConf.icon;
+    const fileTypes = getDocumentFileTypes(doc);
+    const attachmentCount = Array.isArray(doc.attachments) ? doc.attachments.length : 1;
     const isFav = favorites.includes(doc.id);
     const isPopular = (doc.downloadCount || 0) >= 150;
     const isBeingDragged = draggedIndex === idx;
@@ -216,16 +186,22 @@ export default function DocumentGrid({
                 <GripVertical className="w-3.5 h-3.5" />
               </div>
 
-              {/* File Type */}
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase border ${fileConf.badge}`}>
-                <IconComponent className="w-3 h-3" />
-                {doc.fileType}
-              </span>
+              {/* File Types (shows all attached types such as PDF & WORD) */}
+              {fileTypes.map((ftype) => {
+                const conf = getFileTypeConfig(ftype);
+                const IconComp = conf.icon;
+                return (
+                  <span key={ftype} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase border ${conf.badge}`}>
+                    <IconComp className="w-3 h-3" />
+                    {conf.label}
+                  </span>
+                );
+              })}
 
-              {/* Multi-file badge */}
-              {doc.attachments && doc.attachments.length > 1 && (
+              {/* Multi-file count badge */}
+              {attachmentCount > 1 && (
                 <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                  +{doc.attachments.length} ไฟล์
+                  {attachmentCount} ไฟล์
                 </span>
               )}
 
@@ -343,10 +319,15 @@ export default function DocumentGrid({
               onClick={() => {
                 if (!hasDraggedScroll) onDownload(doc);
               }}
-              className="p-1.5 rounded-xl text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors"
-              title="ดาวน์โหลดไฟล์"
+              className="relative p-1.5 rounded-xl text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors"
+              title={attachmentCount > 1 ? `เลือกดาวน์โหลด (${attachmentCount} ไฟล์)` : 'ดาวน์โหลดไฟล์'}
             >
               <Download className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+              {attachmentCount > 1 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-indigo-600 text-white text-[9px] font-extrabold flex items-center justify-center shadow-xs">
+                  {attachmentCount}
+                </span>
+              )}
             </button>
 
             {/* QR Code */}

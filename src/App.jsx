@@ -15,6 +15,7 @@ import {
 
 import { CONFIG, CATEGORIES, YEARS, TARGET_AUDIENCES } from './config/constants';
 import { apiService } from './services/apiService';
+import { getDocumentFileTypes } from './utils/fileTypeConfig';
 
 import Navbar from './components/Navbar';
 import HeroBanner from './components/HeroBanner';
@@ -22,6 +23,7 @@ import DocumentGrid from './components/DocumentGrid';
 import DocumentTable from './components/DocumentTable';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import PreviewModal from './components/PreviewModal';
+import DownloadPickerModal from './components/DownloadPickerModal';
 import QRCodeModal from './components/QRCodeModal';
 import AdminLoginModal from './components/AdminLoginModal';
 import AdminAddEditModal from './components/AdminAddEditModal';
@@ -76,6 +78,8 @@ export default function App() {
   const [editingDoc, setEditingDoc] = useState(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [previewDoc, setPreviewDoc] = useState(null);
+  const [previewInitialIndex, setPreviewInitialIndex] = useState(0);
+  const [downloadPickerDoc, setDownloadPickerDoc] = useState(null);
   const [qrDoc, setQrDoc] = useState(null);
 
   // Toast
@@ -211,15 +215,40 @@ export default function App() {
   };
 
   // Actions
-  const handleDownload = (doc) => {
+  const handleDownload = async (doc, specificFile = null) => {
+    if (!doc) return;
+
+    if (specificFile) {
+      apiService.incrementDownload(doc.id);
+      setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, downloadCount: (d.downloadCount || 0) + 1 } : d));
+      await apiService.downloadSingleFile(specificFile);
+      return;
+    }
+
+    // If document has multiple attachments (e.g. PDF + Word), let user choose 1 or all
+    if (Array.isArray(doc.attachments) && doc.attachments.length > 1) {
+      setDownloadPickerDoc(doc);
+      return;
+    }
+
+    const targetFile = (Array.isArray(doc.attachments) && doc.attachments[0]) ? doc.attachments[0] : doc;
     apiService.incrementDownload(doc.id);
-    const link = doc.downloadUrl || doc.fileUrl;
-    window.open(link, '_blank');
     setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, downloadCount: (d.downloadCount || 0) + 1 } : d));
+    await apiService.downloadSingleFile(targetFile);
   };
 
-  const handlePreview = (doc) => {
+  const handleDownloadAll = async (doc, onProgress = null) => {
+    if (!doc) return;
+    const files = (Array.isArray(doc.attachments) && doc.attachments.length > 0) ? doc.attachments : [doc];
+    apiService.incrementDownload(doc.id);
+    setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, downloadCount: (d.downloadCount || 0) + 1 } : d));
+    await apiService.downloadMultipleFiles(files, onProgress);
+    showToast(`ดาวน์โหลดครบทั้ง ${files.length} ไฟล์เรียบร้อยแล้ว`, 'success');
+  };
+
+  const handlePreview = (doc, fileIndex = 0) => {
     apiService.incrementView(doc.id);
+    setPreviewInitialIndex(fileIndex);
     setPreviewDoc(doc);
     setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, viewCount: (d.viewCount || 0) + 1 } : d));
   };
@@ -288,8 +317,8 @@ export default function App() {
         return false;
       }
 
-      // File Type
-      if (selectedFileType !== 'ทั้งหมด' && doc.fileType !== selectedFileType) {
+      // File Type (matches any attached file type in multi-file documents)
+      if (selectedFileType !== 'ทั้งหมด' && !getDocumentFileTypes(doc).includes(selectedFileType)) {
         return false;
       }
 
@@ -573,9 +602,22 @@ export default function App() {
       {/* Modals */}
       <PreviewModal
         document={previewDoc}
-        onClose={() => setPreviewDoc(null)}
+        initialFileIndex={previewInitialIndex}
+        onClose={() => {
+          setPreviewDoc(null);
+          setPreviewInitialIndex(0);
+        }}
         onDownload={handleDownload}
+        onDownloadAll={handleDownloadAll}
         onCopyLink={handleCopyLink}
+      />
+
+      <DownloadPickerModal
+        document={downloadPickerDoc}
+        onClose={() => setDownloadPickerDoc(null)}
+        onDownloadFile={(doc, file) => handleDownload(doc, file)}
+        onDownloadAll={handleDownloadAll}
+        onPreviewFile={(doc, idx) => handlePreview(doc, idx)}
       />
 
       <QRCodeModal

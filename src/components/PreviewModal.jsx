@@ -7,12 +7,24 @@ import {
   Check, 
   FileText, 
   FolderOpen,
-  Info
+  Info,
+  FolderDown,
+  Loader2
 } from 'lucide-react';
+import { getFileTypeConfig } from '../utils/fileTypeConfig';
 
-export default function PreviewModal({ document, onClose, onDownload, onCopyLink }) {
+export default function PreviewModal({
+  document,
+  initialFileIndex = 0,
+  onClose,
+  onDownload,
+  onDownloadAll,
+  onCopyLink
+}) {
   const [copied, setCopied] = useState(false);
-  const [activeFileIndex, setActiveFileIndex] = useState(0);
+  const [activeFileIndex, setActiveFileIndex] = useState(initialFileIndex || 0);
+  const [isDownloadingOne, setIsDownloadingOne] = useState(false);
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -23,8 +35,8 @@ export default function PreviewModal({ document, onClose, onDownload, onCopyLink
   }, [onClose]);
 
   useEffect(() => {
-    setActiveFileIndex(0);
-  }, [document]);
+    setActiveFileIndex(initialFileIndex || 0);
+  }, [document, initialFileIndex]);
 
   if (!document) return null;
 
@@ -44,6 +56,7 @@ export default function PreviewModal({ document, onClose, onDownload, onCopyLink
   const currentFile = attachments[activeFileIndex] || attachments[0] || {};
   const rawUrl = currentFile.previewUrl || currentFile.url || currentFile.downloadUrl || '';
   const isDriveFolder = rawUrl.includes('/folders/') || rawUrl.includes('drive.google.com/drive/u/');
+  const currentTypeConf = getFileTypeConfig(currentFile.type || document.fileType);
 
   const handleCopy = () => {
     onCopyLink(rawUrl);
@@ -51,13 +64,24 @@ export default function PreviewModal({ document, onClose, onDownload, onCopyLink
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleDownloadCurrent = () => {
-    onDownload({
-      ...document,
-      fileUrl: currentFile.url || currentFile.downloadUrl || rawUrl,
-      downloadUrl: currentFile.downloadUrl || currentFile.url || rawUrl,
-      title: currentFile.name || document.title
-    });
+  const handleDownloadCurrent = async () => {
+    if (isDownloadingOne || isDownloadingAll) return;
+    setIsDownloadingOne(true);
+    try {
+      await onDownload(document, currentFile);
+    } finally {
+      setIsDownloadingOne(false);
+    }
+  };
+
+  const handleDownloadAllClick = async () => {
+    if (isDownloadingOne || isDownloadingAll || !onDownloadAll) return;
+    setIsDownloadingAll(true);
+    try {
+      await onDownloadAll(document);
+    } finally {
+      setIsDownloadingAll(false);
+    }
   };
 
   // Extract Google Drive File ID if present
@@ -117,14 +141,32 @@ export default function PreviewModal({ document, onClose, onDownload, onCopyLink
           </div>
 
           {/* Header Action Buttons */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             <button
+              type="button"
               onClick={handleDownloadCurrent}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white shadow-sm transition-all active:scale-95"
+              disabled={isDownloadingOne || isDownloadingAll}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white shadow-sm transition-all active:scale-95 disabled:opacity-60"
+              title={`ดาวน์โหลดไฟล์ ${currentTypeConf.label}`}
             >
-              <Download className="w-4 h-4" />
-              <span className="hidden sm:inline">ดาวน์โหลด</span>
+              {isDownloadingOne ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              <span className="hidden sm:inline">
+                {attachments.length > 1 ? `โหลด ${currentTypeConf.label}` : 'ดาวน์โหลด'}
+              </span>
             </button>
+
+            {attachments.length > 1 && onDownloadAll && (
+              <button
+                type="button"
+                onClick={handleDownloadAllClick}
+                disabled={isDownloadingOne || isDownloadingAll}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-all active:scale-95 disabled:opacity-60"
+                title={`ดาวน์โหลดทั้งหมด ${attachments.length} ไฟล์`}
+              >
+                {isDownloadingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderDown className="w-4 h-4" />}
+                <span className="hidden sm:inline">โหลดทั้งหมด ({attachments.length})</span>
+              </button>
+            )}
 
             <a
               href={rawUrl}
@@ -206,6 +248,7 @@ export default function PreviewModal({ document, onClose, onDownload, onCopyLink
           {/* Case 1: Embed File iframe (Only when valid embedUrl exists) */}
           {embedUrl ? (
             <iframe
+              key={`${currentFile.driveId || rawUrl}-${activeFileIndex}`}
               src={embedUrl}
               title={currentFile.name || document.title}
               className="w-full h-full rounded-2xl border border-slate-300 dark:border-slate-800 bg-white shadow-inner"

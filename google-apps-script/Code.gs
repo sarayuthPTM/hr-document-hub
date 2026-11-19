@@ -17,6 +17,33 @@ const CONFIG = {
   DEFAULT_PIN: '2725'
 };
 
+const DOCUMENT_HEADERS = [
+  'id', 'title', 'docNumber', 'category', 'fileType', 
+  'fileUrl', 'downloadUrl', 'previewUrl', 'driveFileId', 'fileSize', 
+  'targetAudience', 'academicYear', 'tags', 'description', 
+  'downloadCount', 'viewCount', 'isPinned', 'status', 
+  'createdAt', 'updatedAt', 'uploadedBy', 'fileName', 'attachments'
+];
+
+// Helper: ตรวจสอบและเพิ่มคอลัมน์ที่ขาดในแถวหัวตาราง (เช่น fileName, attachments)
+function ensureDocumentHeaders(sheet) {
+  if (!sheet || sheet.getLastRow() === 0) return DOCUMENT_HEADERS;
+  const lastCol = Math.max(sheet.getLastColumn(), 1);
+  const currentHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim());
+  const missing = DOCUMENT_HEADERS.filter(h => currentHeaders.indexOf(h) === -1);
+  if (missing.length > 0) {
+    const startCol = lastCol + 1;
+    sheet.getRange(1, startCol, 1, missing.length).setValues([missing]);
+    const addedRange = sheet.getRange(1, startCol, 1, missing.length);
+    addedRange.setBackground('#0d9488');
+    addedRange.setFontColor('#ffffff');
+    addedRange.setFontWeight('bold');
+    addedRange.setHorizontalAlignment('center');
+    return currentHeaders.concat(missing);
+  }
+  return currentHeaders;
+}
+
 // Helper: ค้นหา Sheet แผ่นงานข้อมูลเอกสาร
 function getTargetSheet(ss) {
   for (let name of CONFIG.PRIMARY_SHEET_NAMES) {
@@ -312,10 +339,22 @@ function handleFileUpload(data) {
       status: 'active',
       createdAt: Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'dd/MM/yyyy HH:mm'),
       updatedAt: Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'dd/MM/yyyy HH:mm'),
-      uploadedBy: data.uploadedBy || 'Admin'
+      uploadedBy: data.uploadedBy || 'Admin',
+      fileName: data.fileName || '',
+      attachments: JSON.stringify([{
+        name: data.fileName || data.title || 'เอกสารแนบ',
+        url: fileUrl,
+        downloadUrl: downloadUrl,
+        previewUrl: previewUrl,
+        driveId: driveFileId,
+        size: fileSizeFormatted,
+        type: detectFileType(data.fileName)
+      }])
     };
 
-    appendDocumentToSheet(newDoc);
+    if (!data.skipSheetWrite) {
+      appendDocumentToSheet(newDoc);
+    }
 
     return {
       success: true,
@@ -349,6 +388,27 @@ function handleAddDocument(data) {
       }
     }
 
+    let attachmentsStr = '';
+    let parsedAttachments = [];
+    if (typeof data.attachments === 'string' && data.attachments.trim() !== '') {
+      attachmentsStr = data.attachments;
+      try { parsedAttachments = JSON.parse(data.attachments); } catch (e) {}
+    } else if (Array.isArray(data.attachments)) {
+      parsedAttachments = data.attachments;
+      attachmentsStr = JSON.stringify(data.attachments);
+    } else if (data.fileUrl) {
+      parsedAttachments = [{
+        name: data.fileName || data.title || 'เอกสารแนบ',
+        url: data.fileUrl,
+        downloadUrl: data.downloadUrl || downloadUrl,
+        previewUrl: data.previewUrl || previewUrl,
+        driveId: driveFileId,
+        size: data.fileSize || '-',
+        type: data.fileType || detectFileType(data.fileUrl || data.title)
+      }];
+      attachmentsStr = JSON.stringify(parsedAttachments);
+    }
+
     const newDoc = {
       id: 'DOC-' + Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'yyyyMMdd-HHmmss'),
       title: data.title || 'เอกสารไม่มีชื่อ',
@@ -356,8 +416,8 @@ function handleAddDocument(data) {
       category: data.category || 'เอกสารทั่วไป',
       fileType: data.fileType || detectFileType(data.fileUrl || data.title),
       fileUrl: data.fileUrl || '',
-      downloadUrl: downloadUrl,
-      previewUrl: previewUrl,
+      downloadUrl: data.downloadUrl || downloadUrl,
+      previewUrl: data.previewUrl || previewUrl,
       driveFileId: driveFileId,
       fileSize: data.fileSize || '-',
       targetAudience: data.targetAudience || 'บุคลากรทุกคน',
@@ -370,15 +430,21 @@ function handleAddDocument(data) {
       status: 'active',
       createdAt: Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'dd/MM/yyyy HH:mm'),
       updatedAt: Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'dd/MM/yyyy HH:mm'),
-      uploadedBy: data.uploadedBy || 'Admin'
+      uploadedBy: data.uploadedBy || 'Admin',
+      fileName: data.fileName || '',
+      attachments: attachmentsStr
     };
 
     appendDocumentToSheet(newDoc);
 
+    const responseDoc = Object.assign({}, newDoc, {
+      attachments: parsedAttachments
+    });
+
     return {
       success: true,
       message: 'เพิ่มเอกสารสำเร็จ!',
-      document: newDoc
+      document: responseDoc
     };
   } catch (err) {
     return { success: false, error: err.toString() };
@@ -396,8 +462,8 @@ function handleUpdateDocument(data) {
     const sheet = getTargetSheet(ss);
     if (!sheet) throw new Error('Sheet not found');
 
+    const headers = ensureDocumentHeaders(sheet);
     const values = sheet.getDataRange().getValues();
-    const headers = values[0];
     const idColIndex = headers.indexOf('id');
     
     let rowIndex = -1;
@@ -444,6 +510,10 @@ function handleUpdateDocument(data) {
       } catch (uploadErr) {
         Logger.log('Upload in update error: ' + uploadErr.toString());
       }
+    }
+
+    if (Array.isArray(data.attachments)) {
+      data.attachments = JSON.stringify(data.attachments);
     }
 
     const updatedDate = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'dd/MM/yyyy HH:mm');
@@ -599,6 +669,14 @@ function getAllDocuments() {
     item.downloadCount = Number(item.downloadCount) || 0;
     item.viewCount = Number(item.viewCount) || 0;
 
+    if (typeof item.attachments === 'string' && item.attachments.trim() !== '') {
+      try {
+        item.attachments = JSON.parse(item.attachments);
+      } catch (e) {
+        item.attachments = [];
+      }
+    }
+
     list.push(item);
   }
 
@@ -617,10 +695,13 @@ function getAllDocuments() {
 function appendDocumentToSheet(doc) {
   const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
   const sheet = getTargetSheet(ss);
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const headers = ensureDocumentHeaders(sheet);
   
   const row = headers.map(key => {
-    return doc[key] !== undefined ? doc[key] : '';
+    const val = doc[key];
+    if (val === undefined || val === null) return '';
+    if (key === 'attachments' && Array.isArray(val)) return JSON.stringify(val);
+    return val;
   });
 
   sheet.appendRow(row);
@@ -637,17 +718,9 @@ function initDatabaseSheet() {
     sheet = ss.insertSheet('ข้อมูล');
   }
 
-  const headers = [
-    'id', 'title', 'docNumber', 'category', 'fileType', 
-    'fileUrl', 'downloadUrl', 'previewUrl', 'driveFileId', 'fileSize', 
-    'targetAudience', 'academicYear', 'tags', 'description', 
-    'downloadCount', 'viewCount', 'isPinned', 'status', 
-    'createdAt', 'updatedAt', 'uploadedBy'
-  ];
-
-  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.getRange(1, 1, 1, DOCUMENT_HEADERS.length).setValues([DOCUMENT_HEADERS]);
   
-  const headerRange = sheet.getRange(1, 1, 1, headers.length);
+  const headerRange = sheet.getRange(1, 1, 1, DOCUMENT_HEADERS.length);
   headerRange.setBackground('#0d9488');
   headerRange.setFontColor('#ffffff');
   headerRange.setFontWeight('bold');
