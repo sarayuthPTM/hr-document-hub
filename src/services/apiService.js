@@ -175,6 +175,7 @@ class ApiService {
     }
     return {
       ...doc,
+      steps: doc.steps !== undefined && doc.steps !== null ? String(doc.steps) : '',
       attachments
     };
   }
@@ -349,6 +350,7 @@ class ApiService {
       academicYear: payloadDoc.academicYear || String(new Date().getFullYear() + 543),
       tags: payloadDoc.tags || '',
       description: payloadDoc.description || '',
+      steps: payloadDoc.steps || '',
       downloadCount: 0,
       viewCount: 0,
       isPinned: Boolean(payloadDoc.isPinned),
@@ -570,6 +572,7 @@ class ApiService {
       'ปี พ.ศ./การศึกษา': doc.academicYear,
       'แท็ก': doc.tags || '-',
       'รายละเอียด': doc.description || '-',
+      'ขั้นตอนการดำเนินการ': doc.steps || '-',
       'ยอดเปิดดู': doc.viewCount || 0,
       'ยอดดาวน์โหลด': doc.downloadCount || 0,
       'ลิงก์เอกสาร': doc.fileUrl,

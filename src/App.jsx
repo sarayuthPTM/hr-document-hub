@@ -24,6 +24,7 @@ import DocumentTable from './components/DocumentTable';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import PreviewModal from './components/PreviewModal';
 import DownloadPickerModal from './components/DownloadPickerModal';
+import StepsModal from './components/StepsModal';
 import QRCodeModal from './components/QRCodeModal';
 import AdminLoginModal from './components/AdminLoginModal';
 import AdminAddEditModal from './components/AdminAddEditModal';
@@ -80,6 +81,7 @@ export default function App() {
   const [previewDoc, setPreviewDoc] = useState(null);
   const [previewInitialIndex, setPreviewInitialIndex] = useState(0);
   const [downloadPickerDoc, setDownloadPickerDoc] = useState(null);
+  const [stepsDoc, setStepsDoc] = useState(null);
   const [qrDoc, setQrDoc] = useState(null);
 
   // Toast
@@ -551,6 +553,7 @@ export default function App() {
                 isAdmin={isAdmin}
                 onPreview={handlePreview}
                 onDownload={handleDownload}
+                onOpenSteps={(doc) => setStepsDoc(doc)}
                 onOpenQR={(doc) => setQrDoc(doc)}
                 onCopyLink={handleCopyLink}
                 onEdit={handleOpenEdit}
@@ -563,6 +566,7 @@ export default function App() {
                 isAdmin={isAdmin}
                 onPreview={handlePreview}
                 onDownload={handleDownload}
+                onOpenSteps={(doc) => setStepsDoc(doc)}
                 onOpenQR={(doc) => setQrDoc(doc)}
                 onCopyLink={handleCopyLink}
                 onEdit={handleOpenEdit}
@@ -636,6 +640,13 @@ export default function App() {
         onDownloadFile={(doc, file) => handleDownload(doc, file)}
         onDownloadAll={handleDownloadAll}
         onPreviewFile={(doc, idx) => handlePreview(doc, idx)}
+      />
+
+      <StepsModal
+        document={stepsDoc}
+        onClose={() => setStepsDoc(null)}
+        onPreview={handlePreview}
+        onDownload={handleDownload}
       />
 
       <QRCodeModal

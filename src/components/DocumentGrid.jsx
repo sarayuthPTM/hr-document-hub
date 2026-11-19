@@ -14,7 +14,8 @@ import {
   ChevronRight,
   Bookmark,
   GripVertical,
-  FolderOpen
+  FolderOpen,
+  ClipboardList
 } from 'lucide-react';
 import { getFileTypeConfig, getDocumentFileTypes } from '../utils/fileTypeConfig';
 
@@ -23,6 +24,7 @@ export default function DocumentGrid({
   isAdmin, 
   onPreview, 
   onDownload, 
+  onOpenSteps,
   onOpenQR, 
   onCopyLink, 
   onEdit, 
@@ -183,7 +185,7 @@ export default function DocumentGrid({
       >
         {/* Top Badges & Drag Grip Handle */}
         <div>
-          <div className="flex items-center justify-between gap-1 mb-2">
+          <div className="flex items-start justify-between gap-1.5 mb-2">
             <div className="flex items-center gap-1.5 flex-wrap">
               
               {/* Drag Handle Icon (Admin only) */}
@@ -239,23 +241,42 @@ export default function DocumentGrid({
               )}
             </div>
 
-            {/* Favorite / Bookmark Button */}
-            <button
-              type="button"
-              draggable={false}
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleFavorite(doc.id);
-              }}
-              className={`p-1.5 rounded-lg transition-colors ${
-                isFav 
-                  ? 'text-amber-500 bg-amber-50 dark:bg-amber-950/40' 
-                  : 'text-slate-300 dark:text-slate-600 hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-              }`}
-              title={isFav ? 'นำออกจากรายการโปรด' : 'เพิ่มในรายการโปรด'}
-            >
-              <Bookmark className={`w-3.5 h-3.5 ${isFav ? 'fill-amber-500 text-amber-500' : ''}`} />
-            </button>
+            {/* Top-Right Controls: Steps button (when defined) + Bookmark */}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {doc.steps && String(doc.steps).trim() !== '' && (
+                <button
+                  type="button"
+                  draggable={false}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!hasDraggedScroll && onOpenSteps) onOpenSteps(doc);
+                  }}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-sky-50 dark:bg-sky-950/70 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/80 border border-sky-200 dark:border-sky-800 shadow-2xs transition-colors"
+                  title="ดูขั้นตอนการดำเนินการสำหรับคุณครู"
+                >
+                  <ClipboardList className="w-3 h-3 text-indigo-600 dark:text-sky-400" />
+                  <span>ขั้นตอน</span>
+                </button>
+              )}
+
+              {/* Favorite / Bookmark Button */}
+              <button
+                type="button"
+                draggable={false}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleFavorite(doc.id);
+                }}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  isFav 
+                    ? 'text-amber-500 bg-amber-50 dark:bg-amber-950/40' 
+                    : 'text-slate-300 dark:text-slate-600 hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+                title={isFav ? 'นำออกจากรายการโปรด' : 'เพิ่มในรายการโปรด'}
+              >
+                <Bookmark className={`w-3.5 h-3.5 ${isFav ? 'fill-amber-500 text-amber-500' : ''}`} />
+              </button>
+            </div>
           </div>
 
           {/* Category */}

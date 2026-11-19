@@ -13,9 +13,11 @@ import {
   Plus,
   Trash2,
   Download,
-  FolderOpen
+  FolderOpen,
+  ClipboardList
 } from 'lucide-react';
 import { CATEGORIES, TARGET_AUDIENCES, YEARS } from '../config/constants';
+import { parseDocumentSteps } from './StepsModal';
 
 export default function AdminAddEditModal({ 
   isOpen, 
@@ -48,6 +50,7 @@ export default function AdminAddEditModal({
     fileUrl: '',
     tags: '',
     description: '',
+    steps: '',
     isPinned: false
   });
 
@@ -63,6 +66,7 @@ export default function AdminAddEditModal({
         fileUrl: editingDoc.fileUrl || '',
         tags: editingDoc.tags || '',
         description: editingDoc.description || '',
+        steps: editingDoc.steps || '',
         isPinned: Boolean(editingDoc.isPinned)
       });
 
@@ -96,6 +100,7 @@ export default function AdminAddEditModal({
         fileUrl: '',
         tags: '',
         description: '',
+        steps: '',
         isPinned: false
       });
       setExistingFiles([]);
@@ -621,9 +626,46 @@ export default function AdminAddEditModal({
               rows={2}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="ระบุวัตถุประสงค์ หรือขั้นตอนการยื่นเอกสารโดยสังเขป..."
+              placeholder="ระบุวัตถุประสงค์ หรือรายละเอียดโดยสังเขป..."
               className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
+          </div>
+
+          {/* Workflow Steps (Optional - shows as "ขั้นตอน" button at top-right of card) */}
+          <div className="p-3.5 rounded-2xl bg-sky-50/60 dark:bg-sky-950/20 border border-sky-200/80 dark:border-sky-900/50 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="text-xs font-bold text-sky-900 dark:text-sky-200 flex items-center gap-1.5">
+                <ClipboardList className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+                <span>ขั้นตอนการดำเนินการสำหรับคุณครู (แสดงปุ่ม "ขั้นตอน" มุมขวาบน)</span>
+              </label>
+              {parseDocumentSteps(formData.steps).length > 0 && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-300">
+                  {parseDocumentSteps(formData.steps).length} ขั้นตอน
+                </span>
+              )}
+            </div>
+            <textarea
+              rows={4}
+              value={formData.steps}
+              onChange={(e) => setFormData({ ...formData, steps: e.target.value })}
+              placeholder={'พิมพ์บรรทัดละ 1 ขั้นตอน ระบบจะเรียงเป็นข้อ 1, 2, 3... อัตโนมัติ เช่น\nดาวน์โหลดและกรอกแบบฟอร์มให้ครบถ้วน\nเสนอหัวหน้ากลุ่มสาระฯ / หัวหน้างานลงนามรับทราบ\nส่งเอกสารที่งานบุคคลล่วงหน้าอย่างน้อย 1 วัน\nรอรับการอนุมัติจากผู้อำนวยการโรงเรียน'}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-sky-200 dark:border-sky-800 text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 leading-relaxed"
+            />
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+              <span>พิมพ์ 1 บรรทัด = 1 ขั้นตอน (เว้นว่างได้หากเอกสารนี้ไม่มีขั้นตอน)</span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({
+                    ...prev,
+                    steps: 'ดาวน์โหลดและกรอกข้อมูลในแบบฟอร์มให้ครบถ้วน\nเสนอหัวหน้ากลุ่มสาระฯ / หัวหน้างานลงนามเห็นชอบ\nยื่นเอกสารที่กลุ่มบริหารงานบุคคล เพื่อเสนอผู้บริหารพิจารณาลงนาม'
+                  }))}
+                  className="px-2 py-0.5 rounded-lg bg-white dark:bg-slate-800 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 hover:bg-sky-100 transition-colors font-medium"
+                >
+                  + ตัวอย่างใบขออนุญาต
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Pinned Checkbox */}

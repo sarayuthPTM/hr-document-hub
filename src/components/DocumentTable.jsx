@@ -9,7 +9,8 @@ import {
   Star, 
   Edit3, 
   Trash2, 
-  ExternalLink 
+  ExternalLink,
+  ClipboardList
 } from 'lucide-react';
 import { getFileTypeConfig, getDocumentFileTypes } from '../utils/fileTypeConfig';
 
@@ -18,6 +19,7 @@ export default function DocumentTable({
   isAdmin, 
   onPreview, 
   onDownload, 
+  onOpenSteps,
   onOpenQR, 
   onCopyLink, 
   onEdit, 
@@ -130,6 +132,15 @@ export default function DocumentTable({
                 {/* Actions */}
                 <td className="py-3.5 px-4 text-right whitespace-nowrap">
                   <div className="flex items-center justify-end gap-1.5">
+                    {doc.steps && String(doc.steps).trim() !== '' && onOpenSteps && (
+                      <button
+                        onClick={() => onOpenSteps(doc)}
+                        className="p-1.5 rounded-lg text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 transition-colors"
+                        title="ดูขั้นตอนการดำเนินการ"
+                      >
+                        <ClipboardList className="w-4 h-4" />
+                      </button>
+                    )}
                     <button
                       onClick={() => onPreview(doc)}
                       className="p-1.5 rounded-lg text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/40 transition-colors"

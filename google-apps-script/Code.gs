@@ -22,7 +22,7 @@ const DOCUMENT_HEADERS = [
   'fileUrl', 'downloadUrl', 'previewUrl', 'driveFileId', 'fileSize', 
   'targetAudience', 'academicYear', 'tags', 'description', 
   'downloadCount', 'viewCount', 'isPinned', 'status', 
-  'createdAt', 'updatedAt', 'uploadedBy', 'fileName', 'attachments'
+  'createdAt', 'updatedAt', 'uploadedBy', 'fileName', 'attachments', 'steps'
 ];
 
 // Helper: ตรวจสอบและเพิ่มคอลัมน์ที่ขาดในแถวหัวตาราง (เช่น fileName, attachments)
@@ -341,6 +341,7 @@ function handleFileUpload(data) {
       updatedAt: Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'dd/MM/yyyy HH:mm'),
       uploadedBy: data.uploadedBy || 'Admin',
       fileName: data.fileName || '',
+      steps: data.steps || '',
       attachments: JSON.stringify([{
         name: data.fileName || data.title || 'เอกสารแนบ',
         url: fileUrl,
@@ -433,7 +434,8 @@ function handleAddDocument(data) {
       updatedAt: Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'dd/MM/yyyy HH:mm'),
       uploadedBy: data.uploadedBy || 'Admin',
       fileName: data.fileName || '',
-      attachments: attachmentsStr
+      attachments: attachmentsStr,
+      steps: data.steps || ''
     };
 
     appendDocumentToSheet(newDoc);
