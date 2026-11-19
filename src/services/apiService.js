@@ -246,6 +246,22 @@ class ApiService {
     };
   }
 
+  // Build canonical single attachment entry from URL-only document metadata
+  buildAttachmentFromUrl(docData) {
+    const rawUrl = (docData.fileUrl || '').trim();
+    const driveId = docData.driveFileId || this.extractDriveFileId(rawUrl);
+    const isFolder = rawUrl.includes('/folders/');
+    return {
+      name: docData.fileName || docData.title || 'เอกสารแนบ',
+      url: rawUrl,
+      downloadUrl: docData.downloadUrl || (driveId && !isFolder ? `https://drive.google.com/uc?export=download&id=${driveId}` : rawUrl),
+      previewUrl: docData.previewUrl || (driveId && !isFolder ? `https://drive.google.com/file/d/${driveId}/preview` : rawUrl),
+      driveId,
+      size: docData.fileSize || '-',
+      type: docData.fileType || this.detectFileType(rawUrl || docData.title)
+    };
+  }
+
   // Add Document (รองรับ 1 ไฟล์ หรือหลายไฟล์พร้อมกัน)
   async addDocument(docData, newFiles = []) {
     const filesArray = Array.isArray(newFiles) ? newFiles : (newFiles ? [newFiles] : []);
@@ -267,42 +283,55 @@ class ApiService {
       payloadDoc.previewUrl = primary.previewUrl;
       payloadDoc.driveFileId = primary.driveId;
       payloadDoc.fileSize = primary.size;
-      payloadDoc.fileType = primary.type;
+      payloadDoc.fileType = docData.fileType || primary.type;
+      if (uploadedAttachments.length === 1 && docData.fileType) {
+        uploadedAttachments[0] = { ...primary, type: docData.fileType };
+      }
       payloadDoc.fileName = primary.name;
+      payloadDoc.attachments = uploadedAttachments;
+    } else if (payloadDoc.fileUrl && payloadDoc.fileUrl.trim()) {
+      const linkAttachment = this.buildAttachmentFromUrl(payloadDoc);
+      uploadedAttachments = [linkAttachment];
+      payloadDoc.downloadUrl = linkAttachment.downloadUrl;
+      payloadDoc.previewUrl = linkAttachment.previewUrl;
+      payloadDoc.driveFileId = linkAttachment.driveId;
       payloadDoc.attachments = uploadedAttachments;
     }
 
     if (isLive) {
-      try {
-        const payload = {
-          action: 'addDoc',
-          ...payloadDoc,
-          attachments: JSON.stringify(uploadedAttachments)
-        };
+      const payload = {
+        action: 'addDoc',
+        ...payloadDoc,
+        attachments: JSON.stringify(uploadedAttachments)
+      };
 
-        const response = await fetch(this.settings.gasUrl.trim(), {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(payload)
-        });
+      const response = await fetch(this.settings.gasUrl.trim(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      });
 
-        const result = await response.json();
-        if (result.success && result.document) {
-          const finalDoc = this.normalizeDoc({
-            ...result.document,
-            attachments: uploadedAttachments.length > 0 ? uploadedAttachments : result.document.attachments
-          });
-          const currentDocs = this.getLocalDocuments();
-          currentDocs.unshift(finalDoc);
-          localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(currentDocs));
-          return { success: true, document: finalDoc, isLive: true };
-        }
-      } catch (err) {
-        console.warn('Add to GAS failed, falling back to local addition:', err);
+      if (!response.ok) {
+        throw new Error(`เซิร์ฟเวอร์ Google Apps Script ตอบกลับผิดพลาด (HTTP ${response.status})`);
       }
+
+      const result = await response.json();
+      if (!result.success || !result.document) {
+        throw new Error(result.error || result.message || 'ไม่สามารถบันทึกข้อมูลเอกสารลง Google Sheet ได้');
+      }
+
+      const finalDoc = this.normalizeDoc({
+        ...result.document,
+        fileType: payloadDoc.fileType || result.document.fileType,
+        attachments: uploadedAttachments.length > 0 ? uploadedAttachments : result.document.attachments
+      });
+      const currentDocs = this.getLocalDocuments();
+      currentDocs.unshift(finalDoc);
+      localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(currentDocs));
+      return { success: true, document: finalDoc, isLive: true };
     }
 
-    // Local addition
+    // Local addition (Offline / No GAS URL configured)
     const newDoc = this.normalizeDoc({
       id: 'DOC-' + Date.now(),
       title: payloadDoc.title || (filesArray[0] ? filesArray[0].name : 'เอกสารใหม่'),
@@ -317,7 +346,7 @@ class ApiService {
       fileName: payloadDoc.fileName || '',
       attachments: uploadedAttachments,
       targetAudience: payloadDoc.targetAudience || 'บุคลากรทุกคน',
-      academicYear: payloadDoc.academicYear || '2568',
+      academicYear: payloadDoc.academicYear || String(new Date().getFullYear() + 543),
       tags: payloadDoc.tags || '',
       description: payloadDoc.description || '',
       downloadCount: 0,
@@ -353,17 +382,27 @@ class ApiService {
     const baseExisting = Array.isArray(existingFiles)
       ? existingFiles
       : (Array.isArray(docData.attachments) ? docData.attachments : []);
-    const allAttachments = [...baseExisting, ...uploadedAttachments];
+    let allAttachments = [...baseExisting, ...uploadedAttachments];
     const updatedFields = { ...docData };
 
+    if (allAttachments.length === 0 && docData.fileUrl && docData.fileUrl.trim()) {
+      allAttachments = [this.buildAttachmentFromUrl(docData)];
+    }
+
     if (allAttachments.length > 0) {
-      const primary = allAttachments[0];
+      const primary = { ...allAttachments[0] };
+      const chosenType = docData.fileType || primary.type;
+      // If editing a single-file record without uploading new binary, sync the attachment badge type with user's dropdown choice
+      if (allAttachments.length === 1 && filesArray.length === 0 && docData.fileType) {
+        primary.type = docData.fileType;
+        allAttachments = [primary];
+      }
       updatedFields.fileUrl = primary.url;
       updatedFields.downloadUrl = primary.downloadUrl;
       updatedFields.previewUrl = primary.previewUrl;
       updatedFields.driveFileId = primary.driveId;
       updatedFields.fileSize = primary.size;
-      updatedFields.fileType = primary.type;
+      updatedFields.fileType = chosenType;
       updatedFields.fileName = primary.name;
       updatedFields.attachments = allAttachments;
     } else if (Array.isArray(existingFiles)) {
@@ -371,26 +410,28 @@ class ApiService {
     }
 
     if (isLive) {
-      try {
-        const response = await fetch(this.settings.gasUrl.trim(), {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({
-            action: 'updateDoc',
-            ...updatedFields,
-            attachments: JSON.stringify(allAttachments)
-          })
-        });
+      const response = await fetch(this.settings.gasUrl.trim(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'updateDoc',
+          ...updatedFields,
+          attachments: JSON.stringify(allAttachments)
+        })
+      });
 
-        const result = await response.json();
-        if (result.success) {
-          const finalDoc = this.normalizeDoc(updatedFields);
-          this.updateLocalDocument(finalDoc);
-          return { success: true, document: finalDoc, isLive: true };
-        }
-      } catch (err) {
-        console.warn('Update to GAS failed, saving locally:', err);
+      if (!response.ok) {
+        throw new Error(`เซิร์ฟเวอร์ Google Apps Script ตอบกลับผิดพลาด (HTTP ${response.status})`);
       }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || result.message || 'ไม่สามารถอัปเดตข้อมูลเอกสารใน Google Sheet ได้');
+      }
+
+      const finalDoc = this.normalizeDoc(updatedFields);
+      this.updateLocalDocument(finalDoc);
+      return { success: true, document: finalDoc, isLive: true };
     }
 
     // Local / Offline fallback update
@@ -408,26 +449,23 @@ class ApiService {
     const isLive = Boolean(this.settings.gasUrl && this.settings.gasUrl.trim());
 
     if (isLive) {
-      try {
-        const payload = {
-          action: 'deleteDoc',
-          id: id
-        };
+      const response = await fetch(this.settings.gasUrl.trim(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'deleteDoc', id })
+      });
 
-        const response = await fetch(this.settings.gasUrl.trim(), {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(payload)
-        });
-
-        const result = await response.json();
-        if (result.success) {
-          this.deleteLocalDocument(id);
-          return { success: true, isLive: true };
-        }
-      } catch (err) {
-        console.warn('Delete from GAS failed, deleting locally:', err);
+      if (!response.ok) {
+        throw new Error(`เซิร์ฟเวอร์ Google Apps Script ตอบกลับผิดพลาด (HTTP ${response.status})`);
       }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || result.message || 'ไม่สามารถลบเอกสารใน Google Sheet ได้');
+      }
+
+      this.deleteLocalDocument(id);
+      return { success: true, isLive: true };
     }
 
     this.deleteLocalDocument(id);

@@ -35,13 +35,15 @@ export default function AdminAddEditModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  const defaultYear = String(new Date().getFullYear() + 543);
+
   // Form State
   const [formData, setFormData] = useState({
     title: '',
     docNumber: '',
     category: 'แบบฟอร์มใบลาและขออนุญาต',
     targetAudience: 'บุคลากรทุกคน',
-    academicYear: '2568',
+    academicYear: defaultYear,
     fileType: 'PDF',
     fileUrl: '',
     tags: '',
@@ -56,7 +58,7 @@ export default function AdminAddEditModal({
         docNumber: editingDoc.docNumber || '',
         category: editingDoc.category || 'แบบฟอร์มใบลาและขออนุญาต',
         targetAudience: editingDoc.targetAudience || 'บุคลากรทุกคน',
-        academicYear: editingDoc.academicYear || '2568',
+        academicYear: editingDoc.academicYear ? String(editingDoc.academicYear) : defaultYear,
         fileType: editingDoc.fileType || 'PDF',
         fileUrl: editingDoc.fileUrl || '',
         tags: editingDoc.tags || '',
@@ -89,7 +91,7 @@ export default function AdminAddEditModal({
         docNumber: '',
         category: 'แบบฟอร์มใบลาและขออนุญาต',
         targetAudience: 'บุคลากรทุกคน',
-        academicYear: '2568',
+        academicYear: defaultYear,
         fileType: 'PDF',
         fileUrl: '',
         tags: '',
@@ -171,7 +173,13 @@ export default function AdminAddEditModal({
   };
 
   const handleRemoveExistingFile = (index) => {
-    setExistingFiles(prev => prev.filter((_, i) => i !== index));
+    setExistingFiles(prev => {
+      const next = prev.filter((_, i) => i !== index);
+      if (next.length === 0) {
+        setFormData(f => ({ ...f, fileUrl: '' }));
+      }
+      return next;
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -183,21 +191,28 @@ export default function AdminAddEditModal({
       return;
     }
 
-    // Must have at least 1 file (existing or new) or a valid link
     const totalFiles = existingFiles.length + newFiles.length;
-    if (mode === 'upload' && totalFiles === 0 && !formData.fileUrl.trim()) {
+    const trimmedUrl = formData.fileUrl.trim();
+    const isLinkChanged = Boolean(trimmedUrl && editingDoc && trimmedUrl !== (editingDoc.fileUrl || '').trim());
+
+    if (mode === 'upload' && totalFiles === 0) {
       setError('กรุณาเลือกไฟล์จากคอมพิวเตอร์อย่างน้อย 1 ไฟล์');
       return;
     }
 
-    if (mode === 'link' && !formData.fileUrl.trim() && totalFiles === 0) {
+    if (mode === 'link' && !trimmedUrl && totalFiles === 0) {
       setError('กรุณาระบุลิงก์ไฟล์ หรือเลือกไฟล์จากคอมพิวเตอร์');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      await onSave(formData, newFiles, existingFiles);
+      // If user explicitly changed external URL in Link tab while editing, replace primary attachment cleanly
+      let filesToKeep = existingFiles;
+      if (mode === 'link' && isLinkChanged) {
+        filesToKeep = [];
+      }
+      await onSave(formData, newFiles, filesToKeep);
       onClose();
     } catch (err) {
       setError('เกิดข้อผิดพลาดในการบันทึก: ' + (err.message || err));

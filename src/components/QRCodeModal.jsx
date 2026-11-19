@@ -1,12 +1,29 @@
-import React, { useState } from 'react';
-import { X, QrCode, Copy, Check, Download, ExternalLink } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, QrCode, Copy, Check, Download } from 'lucide-react';
+import { getFileTypeConfig } from '../utils/fileTypeConfig';
 
 export default function QRCodeModal({ document, onClose, onCopyLink }) {
   const [copied, setCopied] = useState(false);
+  const [activeFileIndex, setActiveFileIndex] = useState(0);
+
+  useEffect(() => {
+    setActiveFileIndex(0);
+    setCopied(false);
+  }, [document]);
 
   if (!document) return null;
 
-  const targetUrl = document.downloadUrl || document.fileUrl;
+  const attachments = (Array.isArray(document.attachments) && document.attachments.length > 0)
+    ? document.attachments
+    : [{
+        name: document.fileName || document.title || 'เอกสารแนบ',
+        url: document.fileUrl || '',
+        downloadUrl: document.downloadUrl || document.fileUrl || '',
+        type: document.fileType || 'FILE'
+      }];
+
+  const currentFile = attachments[activeFileIndex] || attachments[0] || {};
+  const targetUrl = currentFile.downloadUrl || currentFile.url || document.downloadUrl || document.fileUrl || '';
   const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(targetUrl)}&margin=10`;
 
   const handleCopy = () => {
@@ -48,6 +65,29 @@ export default function QRCodeModal({ document, onClose, onCopyLink }) {
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 px-2">
           ใช้สมาร์ตโฟนหรือ LINE สแกนเพื่อเปิดดู/ดาวน์โหลดเอกสารลงเครื่องทันที
         </p>
+
+        {/* Multi-file QR selector */}
+        {attachments.length > 1 && (
+          <div className="flex flex-wrap items-center justify-center gap-1.5 mb-3 w-full">
+            {attachments.map((file, idx) => {
+              const conf = getFileTypeConfig(file.type);
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setActiveFileIndex(idx)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all border ${
+                    activeFileIndex === idx
+                      ? 'bg-teal-600 text-white border-teal-600 shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  {conf.label}: {file.name ? file.name.slice(0, 16) : `ไฟล์ ${idx + 1}`}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* QR Code Container */}
         <div className="p-3 bg-white rounded-2xl border-2 border-slate-200 dark:border-slate-700 shadow-inner mb-4">

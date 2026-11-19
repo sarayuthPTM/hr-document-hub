@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Settings, 
@@ -42,23 +42,48 @@ export default function AdminSettingsModal({
   const [testResult, setTestResult] = useState(null);
   const [isInitializing, setIsInitializing] = useState(false);
   const [initResult, setInitResult] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+
+  // Sync latest settings from Google Sheet whenever modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setGasUrl(settings.gasUrl || CONFIG.DEFAULT_GAS_URL || '');
+      setAdminPin(settings.adminPin || CONFIG.DEFAULT_PIN);
+      setAppNameTh(settings.appNameTh || CONFIG.APP_NAME_TH);
+      setAppNameEn(settings.appNameEn || CONFIG.APP_NAME);
+      setSchoolName(settings.schoolName || CONFIG.SCHOOL_NAME);
+      setDepartmentName(settings.departmentName || CONFIG.DEPARTMENT_NAME);
+      setDeveloper(settings.developer || CONFIG.DEVELOPER_NAME);
+      setTagline(settings.tagline || CONFIG.TAGLINE);
+      setTestResult(null);
+      setInitResult(null);
+    }
+  }, [isOpen, settings]);
 
   if (!isOpen) return null;
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
-    onSaveSettings({
-      gasUrl: gasUrl.trim(),
-      adminPin: adminPin.trim(),
-      appNameTh: appNameTh.trim(),
-      appNameEn: appNameEn.trim(),
-      schoolName: schoolName.trim(),
-      departmentName: departmentName.trim(),
-      developer: developer.trim(),
-      tagline: tagline.trim()
-    });
-    setTestResult({ success: true, message: 'บันทึกการตั้งค่าและข้อมูลระบบเรียบร้อยแล้ว' });
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      await onSaveSettings({
+        gasUrl: gasUrl.trim(),
+        adminPin: adminPin.trim(),
+        appNameTh: appNameTh.trim(),
+        appNameEn: appNameEn.trim(),
+        schoolName: schoolName.trim(),
+        departmentName: departmentName.trim(),
+        developer: developer.trim(),
+        tagline: tagline.trim()
+      });
+      setTestResult({ success: true, message: 'บันทึกการตั้งค่าและข้อมูลระบบเรียบร้อยแล้ว' });
+    } catch (err) {
+      setTestResult({ success: false, message: 'บันทึกการตั้งค่าไม่สำเร็จ: ' + (err.message || err) });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleTest = async () => {
@@ -309,9 +334,10 @@ export default function AdminSettingsModal({
 
             <button
               type="submit"
-              className="px-6 py-2 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white shadow-sm transition-all active:scale-95"
+              disabled={isSaving}
+              className="px-6 py-2 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white shadow-sm transition-all active:scale-95 disabled:opacity-60"
             >
-              บันทึกการตั้งค่าทั้งหมด
+              {isSaving ? 'กำลังบันทึก...' : 'บันทึกการตั้งค่าทั้งหมด'}
             </button>
           </div>
 

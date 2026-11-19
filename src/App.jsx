@@ -201,17 +201,25 @@ export default function App() {
 
   const handleDeleteDoc = async (doc) => {
     if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบเอกสาร "${doc.title}"?`)) {
-      await apiService.deleteDocument(doc.id);
-      showToast('ลบเอกสารสำเร็จ', 'info');
-      loadDocs();
+      try {
+        await apiService.deleteDocument(doc.id);
+        showToast('ลบเอกสารสำเร็จ', 'info');
+        loadDocs();
+      } catch (err) {
+        showToast('ลบเอกสารไม่สำเร็จ: ' + (err.message || err), 'error');
+      }
     }
   };
 
   const handleTogglePin = async (doc) => {
-    const updated = { ...doc, isPinned: !doc.isPinned };
-    await apiService.updateDocument(updated);
-    showToast(updated.isPinned ? 'ปักหมุดเอกสารเด่นแล้ว' : 'ยกเลิกการปักหมุดแล้ว', 'success');
-    loadDocs();
+    try {
+      const updated = { ...doc, isPinned: !doc.isPinned };
+      await apiService.updateDocument(updated);
+      showToast(updated.isPinned ? 'ปักหมุดเอกสารเด่นแล้ว' : 'ยกเลิกการปักหมุดแล้ว', 'success');
+      loadDocs();
+    } catch (err) {
+      showToast('ไม่สามารถเปลี่ยนสถานะปักหมุดได้: ' + (err.message || err), 'error');
+    }
   };
 
   // Actions
@@ -430,6 +438,7 @@ export default function App() {
                     <option value="XLSX">Excel (XLSX)</option>
                     <option value="PPTX">PowerPoint (PPTX)</option>
                     <option value="ZIP">ZIP</option>
+                    <option value="IMAGE">รูปภาพ (JPG / PNG)</option>
                   </select>
                   <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>

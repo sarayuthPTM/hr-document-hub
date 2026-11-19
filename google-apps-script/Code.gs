@@ -396,7 +396,8 @@ function handleAddDocument(data) {
     } else if (Array.isArray(data.attachments)) {
       parsedAttachments = data.attachments;
       attachmentsStr = JSON.stringify(data.attachments);
-    } else if (data.fileUrl) {
+    }
+    if ((!Array.isArray(parsedAttachments) || parsedAttachments.length === 0) && data.fileUrl) {
       parsedAttachments = [{
         name: data.fileName || data.title || 'เอกสารแนบ',
         url: data.fileUrl,
