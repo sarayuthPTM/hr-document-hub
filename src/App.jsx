@@ -137,8 +137,8 @@ export default function App() {
     setToast({ message, type });
   };
 
-  // Reorder documents (Drag & Drop - Admin only)
-  const handleReorderDocs = (fromIndex, toIndex) => {
+  // Reorder documents (Drag & Drop - Admin only, persists to both LocalStorage & Google Sheet)
+  const handleReorderDocs = async (fromIndex, toIndex) => {
     if (!isAdmin) return;
     const docToMove = filteredDocuments[fromIndex];
     if (!docToMove) return;
@@ -148,15 +148,26 @@ export default function App() {
     const targetDoc = filteredDocuments[toIndex];
     const actualToIdx = targetDoc ? newDocs.findIndex(d => d.id === targetDoc.id) : toIndex;
 
-    if (actualFromIdx === -1 || actualToIdx === -1) return;
+    if (actualFromIdx === -1 || actualToIdx === -1 || actualFromIdx === actualToIdx) return;
 
     const [moved] = newDocs.splice(actualFromIdx, 1);
     newDocs.splice(actualToIdx, 0, moved);
 
     setDocuments(newDocs);
     setSortBy('custom');
-    localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(newDocs));
-    showToast('สลับลำดับเอกสารเรียบร้อยแล้ว', 'success');
+    showToast('กำลังบันทึกลำดับเอกสารลง Google Sheet...', 'info');
+
+    const saveRes = await apiService.saveDocumentOrder(newDocs);
+    const serializedOrder = JSON.stringify(newDocs.map(d => String(d.id)));
+    setSettings(prev => ({ ...prev, customDocOrder: serializedOrder }));
+
+    if (saveRes?.synced) {
+      showToast('สลับตำแหน่งและบันทึกลง Google Sheet เรียบร้อยแล้ว', 'success');
+    } else if (saveRes?.error) {
+      showToast('สลับในหน้านี้แล้ว แต่บันทึกขึ้น Google Sheet ไม่สำเร็จ: ' + saveRes.error, 'error');
+    } else {
+      showToast('สลับลำดับเอกสารเรียบร้อยแล้ว', 'success');
+    }
   };
 
   // Toggle favorite

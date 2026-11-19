@@ -11,6 +11,10 @@ const MOCK_DOC_IDS = new Set([
 class ApiService {
   constructor() {
     this.settings = this.loadSettings();
+    this._activeOrderSavePromise = null;
+    this._queuedOrderSerialized = null;
+    this._pendingOrderIds = null;
+    this._isSavingOrder = false;
   }
 
   // Filter out any mock/simulated documents
@@ -74,6 +78,144 @@ class ApiService {
   }
 
   /**
+   * Apply Admin's saved custom document order (falls back to pinned -> newest id).
+   */
+  applyCustomOrder(list, rawCustomOrder = null) {
+    if (!Array.isArray(list) || list.length === 0) return [];
+
+    let orderIds = [];
+    const effectiveSource = Array.isArray(this._pendingOrderIds) && this._pendingOrderIds.length > 0
+      ? this._pendingOrderIds
+      : (rawCustomOrder !== null && rawCustomOrder !== undefined ? rawCustomOrder : this.settings?.customDocOrder);
+
+    if (Array.isArray(effectiveSource)) {
+      orderIds = effectiveSource.map(id => String(id));
+    } else if (typeof effectiveSource === 'string' && effectiveSource.trim().startsWith('[')) {
+      try {
+        const parsed = JSON.parse(effectiveSource);
+        if (Array.isArray(parsed)) {
+          orderIds = parsed.map(id => String(id));
+        }
+      } catch {}
+    }
+
+    if (orderIds.length === 0) {
+      return [...list].sort((a, b) => {
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+        return String(b.id).localeCompare(String(a.id));
+      });
+    }
+
+    const rankMap = new Map();
+    orderIds.forEach((id, idx) => rankMap.set(id, idx));
+
+    return [...list].sort((a, b) => {
+      const rankA = rankMap.has(String(a.id)) ? rankMap.get(String(a.id)) : -1;
+      const rankB = rankMap.has(String(b.id)) ? rankMap.get(String(b.id)) : -1;
+      if (rankA !== -1 && rankB !== -1) return rankA - rankB;
+      if (rankA === -1 && rankB !== -1) return -1;
+      if (rankA !== -1 && rankB === -1) return 1;
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return String(b.id).localeCompare(String(a.id));
+    });
+  }
+
+  /**
+   * Save Admin's custom card order to both LocalStorage and Google Sheet ('ตั้งค่าระบบ').
+   * Uses a single-slot coalescing queue so rapid consecutive drags never race.
+   */
+  async saveDocumentOrder(orderedDocs) {
+    const orderedIds = Array.isArray(orderedDocs) ? orderedDocs.map(d => String(d.id)) : [];
+    const serialized = JSON.stringify(orderedIds);
+
+    this._pendingOrderIds = orderedIds;
+    this._queuedOrderSerialized = serialized;
+    this.settings = { ...this.settings, customDocOrder: serialized };
+    localStorage.setItem(CONFIG.STORAGE_KEY_SETTINGS, JSON.stringify(this.settings));
+    if (Array.isArray(orderedDocs)) {
+      localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(orderedDocs));
+    }
+
+    const gasUrl = this.settings.gasUrl ? this.settings.gasUrl.trim() : '';
+    if (!gasUrl) {
+      this._isSavingOrder = false;
+      this._pendingOrderIds = null;
+      return { success: true, synced: false };
+    }
+
+    if (this._activeOrderSavePromise) {
+      return this._activeOrderSavePromise;
+    }
+
+    this._isSavingOrder = true;
+    this._activeOrderSavePromise = (async () => {
+      let lastResult = { success: true, synced: false };
+      try {
+        while (this._queuedOrderSerialized !== null) {
+          const payloadOrder = this._queuedOrderSerialized;
+          this._queuedOrderSerialized = null;
+          try {
+            const res = await fetch(gasUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({
+                action: 'updateSettings',
+                settings: { customDocOrder: payloadOrder }
+              })
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+              throw new Error(data.error || data.message || `HTTP ${res.status}`);
+            }
+            lastResult = { success: true, synced: true };
+          } catch (err) {
+            console.error('Sync customDocOrder failed:', err);
+            lastResult = { success: false, synced: false, error: err.message || String(err) };
+          }
+        }
+      } finally {
+        this._isSavingOrder = false;
+        this._pendingOrderIds = null;
+        this._activeOrderSavePromise = null;
+      }
+      return lastResult;
+    })();
+
+    return this._activeOrderSavePromise;
+  }
+
+  /**
+   * Fast (~0.5s) read of public 'ตั้งค่าระบบ' sheet via GViz so customDocOrder is known immediately.
+   */
+  async fetchSettingsFastFromSheet(signal = null) {
+    if (!CONFIG.SHEET_ID) return null;
+    try {
+      const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:json&headers=1&sheet=${encodeURIComponent('ตั้งค่าระบบ')}&_t=${Date.now()}`;
+      const res = await fetch(url, signal ? { signal } : undefined);
+      if (!res.ok) return null;
+      const text = await res.text();
+      const startIdx = text.indexOf('{');
+      const endIdx = text.lastIndexOf('}');
+      if (startIdx === -1 || endIdx <= startIdx) return null;
+
+      const parsed = JSON.parse(text.slice(startIdx, endIdx + 1));
+      const rows = parsed?.table?.rows || [];
+      const fastSettings = {};
+      for (const row of rows) {
+        const cells = row?.c || [];
+        const k = cells[0]?.v !== undefined && cells[0]?.v !== null ? String(cells[0].v).trim() : '';
+        const v = cells[1]?.v !== undefined && cells[1]?.v !== null ? String(cells[1].v) : '';
+        if (k) fastSettings[k] = v;
+      }
+      return fastSettings;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  /**
    * Ultra-fast (~0.5s) read directly from public Google Sheet GViz endpoint (no GAS cold-start delay).
    */
   async fetchDocumentsFastFromSheet() {
@@ -81,10 +223,13 @@ class ApiService {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 3500);
     try {
-      const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:json&headers=1&sheet=${encodeURIComponent('ข้อมูล')}&_t=${Date.now()}`;
-      const res = await fetch(url, { signal: controller.signal });
-      if (!res.ok) return null;
-      const text = await res.text();
+      const docsUrl = `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:json&headers=1&sheet=${encodeURIComponent('ข้อมูล')}&_t=${Date.now()}`;
+      const [docsRes, fastSettings] = await Promise.all([
+        fetch(docsUrl, { signal: controller.signal }),
+        this.fetchSettingsFastFromSheet(controller.signal)
+      ]);
+      if (!docsRes.ok) return null;
+      const text = await docsRes.text();
       const startIdx = text.indexOf('{');
       const endIdx = text.lastIndexOf('}');
       if (startIdx === -1 || endIdx <= startIdx) return null;
@@ -119,16 +264,16 @@ class ApiService {
         list.push(item);
       }
 
-      list.sort((a, b) => {
-        if (a.isPinned && !b.isPinned) return -1;
-        if (!a.isPinned && b.isPinned) return 1;
-        return String(b.id).localeCompare(String(a.id));
-      });
+      if (fastSettings && typeof fastSettings === 'object' && !this._isSavingOrder) {
+        this.settings = { ...this.settings, ...fastSettings };
+        localStorage.setItem(CONFIG.STORAGE_KEY_SETTINGS, JSON.stringify(this.settings));
+      }
 
       const cleaned = this.cleanDocsList(list);
       const normalized = cleaned.map(d => this.normalizeDoc(d));
+      const ordered = this.applyCustomOrder(normalized, fastSettings?.customDocOrder ?? this.settings?.customDocOrder);
       const hasExtendedSchema = headers.includes('attachments') && headers.includes('steps');
-      return { data: normalized, hasExtendedSchema };
+      return { data: ordered, hasExtendedSchema };
     } catch (err) {
       console.warn('Fast GViz fetch skipped:', err);
       return null;
@@ -166,16 +311,23 @@ class ApiService {
           if (resJson.success) {
             // ซิงก์การตั้งค่าและรหัสผ่านล่าสุดจาก Google Sheet
             if (resJson.settings && typeof resJson.settings === 'object') {
+              const preservedOrder = this._isSavingOrder && this._pendingOrderIds
+                ? JSON.stringify(this._pendingOrderIds)
+                : undefined;
               this.settings = { ...this.settings, ...resJson.settings };
+              if (preservedOrder !== undefined) {
+                this.settings.customDocOrder = preservedOrder;
+              }
               localStorage.setItem(CONFIG.STORAGE_KEY_SETTINGS, JSON.stringify(this.settings));
             }
 
             if (Array.isArray(resJson.data)) {
               const cleaned = this.cleanDocsList(resJson.data);
               const normalized = cleaned.map(d => this.normalizeDoc(d));
-              localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(normalized));
+              const ordered = this.applyCustomOrder(normalized, this.settings.customDocOrder);
+              localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(ordered));
               return {
-                data: normalized,
+                data: ordered,
                 settings: this.settings,
                 isLive: true,
                 message: 'ดึงข้อมูลสดจาก Google Sheet สำเร็จ'
@@ -203,8 +355,9 @@ class ApiService {
         if (Array.isArray(parsed)) {
           const cleaned = this.cleanDocsList(parsed);
           const normalized = cleaned.map(d => this.normalizeDoc(d));
-          localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(normalized));
-          return { data: normalized, settings: this.settings, isLive: false, message: 'แสดงข้อมูลจากความจำเครื่อง (ออฟไลน์)' };
+          const ordered = this.applyCustomOrder(normalized, this.settings?.customDocOrder);
+          localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(ordered));
+          return { data: ordered, settings: this.settings, isLive: false, message: 'แสดงข้อมูลจากความจำเครื่อง (ออฟไลน์)' };
         }
       }
     } catch (e) {
@@ -674,7 +827,9 @@ class ApiService {
     try {
       const saved = localStorage.getItem(CONFIG.STORAGE_KEY_DOCS);
       const list = saved ? JSON.parse(saved) : [];
-      return Array.isArray(list) ? this.cleanDocsList(list).map(d => this.normalizeDoc(d)) : [];
+      if (!Array.isArray(list)) return [];
+      const cleaned = this.cleanDocsList(list).map(d => this.normalizeDoc(d));
+      return this.applyCustomOrder(cleaned, this.settings?.customDocOrder);
     } catch {
       return [];
     }
