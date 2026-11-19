@@ -196,6 +196,17 @@ export default function DocumentGrid({
     const isBeingDragged = draggedIndex === idx;
     const isDropTarget = dragOverIndex === idx && draggedIndex !== idx;
 
+    const hasSteps = Boolean(doc.steps && String(doc.steps).trim() !== '');
+    const descStr = String(doc.description || '').trim();
+    const hasDesc = Boolean(descStr);
+    const isLongDesc = descStr.includes('\n') || descStr.length > 55;
+    const showGuideBtn = hasSteps || isLongDesc;
+    const guideBtnLabel = hasSteps && hasDesc
+      ? 'ขั้นตอน & เอกสาร'
+      : hasSteps
+        ? 'ขั้นตอน'
+        : 'เตรียมเอกสาร';
+
     return (
       <div
         key={doc.id}
@@ -276,9 +287,9 @@ export default function DocumentGrid({
               )}
             </div>
 
-            {/* Top-Right Controls: Steps button (when defined or quick-add for Admin) + Bookmark */}
+            {/* Top-Right Controls: Guide button ("ขั้นตอน & เอกสาร" / "ขั้นตอน" / "เตรียมเอกสาร") + Bookmark */}
             <div className="flex items-center gap-1 flex-shrink-0">
-              {doc.steps && String(doc.steps).trim() !== '' ? (
+              {showGuideBtn ? (
                 <button
                   type="button"
                   draggable={false}
@@ -286,11 +297,11 @@ export default function DocumentGrid({
                     e.stopPropagation();
                     if (!hasDraggedScroll && onOpenSteps) onOpenSteps(doc);
                   }}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-sky-50 dark:bg-sky-950/70 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/80 border border-sky-200 dark:border-sky-800 shadow-2xs transition-colors"
-                  title="ดูขั้นตอนการดำเนินการสำหรับคุณครู"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-sky-50 dark:bg-sky-950/70 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/80 border border-sky-200 dark:border-sky-800 shadow-2xs transition-colors whitespace-nowrap"
+                  title="คลิกดูขั้นตอนการดำเนินการและเอกสารที่ต้องเตรียม"
                 >
-                  <ClipboardList className="w-3 h-3 text-indigo-600 dark:text-sky-400" />
-                  <span>ขั้นตอน</span>
+                  <ClipboardList className="w-3 h-3 text-indigo-600 dark:text-sky-400 flex-shrink-0" />
+                  <span>{guideBtnLabel}</span>
                 </button>
               ) : isAdmin ? (
                 <button
@@ -300,7 +311,7 @@ export default function DocumentGrid({
                     e.stopPropagation();
                     if (!hasDraggedScroll && onEdit) onEdit(doc);
                   }}
-                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg text-[10px] font-medium border border-dashed border-sky-300 dark:border-sky-800 text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 transition-colors"
+                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg text-[10px] font-medium border border-dashed border-sky-300 dark:border-sky-800 text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 transition-colors whitespace-nowrap"
                   title="คลิกเพื่อเพิ่มขั้นตอนการดำเนินการ"
                 >
                   <ClipboardList className="w-2.5 h-2.5" />
@@ -344,11 +355,24 @@ export default function DocumentGrid({
             {doc.title}
           </h3>
 
-          {/* Description */}
-          {doc.description && (
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 mb-2 leading-relaxed">
-              {doc.description}
-            </p>
+          {/* Description (clickable to view full checklist/details when clipped or has steps) */}
+          {hasDesc && (
+            <div
+              onClick={showGuideBtn ? () => !hasDraggedScroll && onOpenSteps && onOpenSteps(doc) : undefined}
+              className={`mb-2 ${showGuideBtn ? 'cursor-pointer group/desc' : ''}`}
+              title={showGuideBtn ? 'คลิกเพื่ออ่านรายละเอียดและเช็กลิสต์ทั้งหมด' : undefined}
+            >
+              <p className={`text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed ${
+                showGuideBtn ? 'group-hover/desc:text-sky-700 dark:group-hover/desc:text-sky-300 transition-colors' : ''
+              }`}>
+                {descStr}
+              </p>
+              {isLongDesc && (
+                <span className="inline-block text-[10px] font-semibold text-sky-600 dark:text-sky-400 group-hover/desc:underline mt-0.5">
+                  อ่านรายละเอียดทั้งหมด ↗
+                </span>
+              )}
+            </div>
           )}
 
           {/* Tags */}
