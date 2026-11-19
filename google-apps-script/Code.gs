@@ -520,14 +520,15 @@ function handleUpdateDocument(data) {
     }
 
     const updatedDate = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'dd/MM/yyyy HH:mm');
-    headers.forEach((key, colIdx) => {
+    const existingRow = values[rowIndex - 1] || [];
+    const updatedRow = headers.map((key, colIdx) => {
+      if (key === 'updatedAt') return updatedDate;
       if (data[key] !== undefined && key !== 'id' && key !== 'createdAt') {
-        sheet.getRange(rowIndex, colIdx + 1).setValue(data[key]);
+        return data[key];
       }
-      if (key === 'updatedAt') {
-        sheet.getRange(rowIndex, colIdx + 1).setValue(updatedDate);
-      }
+      return existingRow[colIdx] !== undefined ? existingRow[colIdx] : '';
     });
+    sheet.getRange(rowIndex, 1, 1, headers.length).setValues([updatedRow]);
 
     return {
       success: true,
