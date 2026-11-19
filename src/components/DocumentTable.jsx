@@ -16,6 +16,7 @@ import { getFileTypeConfig, getDocumentFileTypes } from '../utils/fileTypeConfig
 
 export default function DocumentTable({ 
   documents, 
+  isLoading = false,
   isAdmin, 
   onPreview, 
   onDownload, 
@@ -33,6 +34,16 @@ export default function DocumentTable({
     setCopiedId(doc.id);
     setTimeout(() => setCopiedId(null), 2000);
   };
+
+  if (isLoading && documents.length === 0) {
+    return (
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 my-6 space-y-3 animate-pulse">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="h-10 rounded-xl bg-slate-100 dark:bg-slate-800/70" />
+        ))}
+      </div>
+    );
+  }
 
   if (documents.length === 0) {
     return null;

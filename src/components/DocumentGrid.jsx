@@ -21,6 +21,7 @@ import { getFileTypeConfig, getDocumentFileTypes } from '../utils/fileTypeConfig
 
 export default function DocumentGrid({ 
   documents, 
+  isLoading = false,
   isAdmin, 
   onPreview, 
   onDownload, 
@@ -132,6 +133,40 @@ export default function DocumentGrid({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  if (isLoading && documents.length === 0) {
+    return (
+      <div className="space-y-3 my-4">
+        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 px-1">
+          <span className="w-2 h-2 rounded-full bg-teal-500 animate-ping" />
+          <span>กำลังโหลดรายการเอกสารจากระบบ...</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
+          {[...Array(8)].map((_, i) => (
+            <div
+              key={i}
+              className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3 animate-pulse"
+            >
+              <div className="flex items-center justify-between">
+                <div className="h-5 w-14 rounded-lg bg-slate-200 dark:bg-slate-800" />
+                <div className="h-5 w-16 rounded-lg bg-slate-100 dark:bg-slate-800/80" />
+              </div>
+              <div className="h-3 w-28 rounded bg-teal-100/70 dark:bg-teal-950/60" />
+              <div className="space-y-1.5">
+                <div className="h-4 w-full rounded bg-slate-200 dark:bg-slate-800" />
+                <div className="h-4 w-3/4 rounded bg-slate-200 dark:bg-slate-800" />
+              </div>
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
+                <div className="h-8 flex-1 rounded-xl bg-teal-100/60 dark:bg-teal-950/40" />
+                <div className="h-8 w-8 rounded-xl bg-slate-100 dark:bg-slate-800" />
+                <div className="h-8 w-8 rounded-xl bg-slate-100 dark:bg-slate-800" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   if (documents.length === 0) {
     return (
       <div className="bg-white dark:bg-slate-900 rounded-3xl p-10 sm:p-14 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 my-6 shadow-xs animate-in fade-in duration-300">
@@ -241,9 +276,9 @@ export default function DocumentGrid({
               )}
             </div>
 
-            {/* Top-Right Controls: Steps button (when defined) + Bookmark */}
+            {/* Top-Right Controls: Steps button (when defined or quick-add for Admin) + Bookmark */}
             <div className="flex items-center gap-1 flex-shrink-0">
-              {doc.steps && String(doc.steps).trim() !== '' && (
+              {doc.steps && String(doc.steps).trim() !== '' ? (
                 <button
                   type="button"
                   draggable={false}
@@ -257,7 +292,21 @@ export default function DocumentGrid({
                   <ClipboardList className="w-3 h-3 text-indigo-600 dark:text-sky-400" />
                   <span>ขั้นตอน</span>
                 </button>
-              )}
+              ) : isAdmin ? (
+                <button
+                  type="button"
+                  draggable={false}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!hasDraggedScroll && onEdit) onEdit(doc);
+                  }}
+                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg text-[10px] font-medium border border-dashed border-sky-300 dark:border-sky-800 text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 transition-colors"
+                  title="คลิกเพื่อเพิ่มขั้นตอนการดำเนินการ"
+                >
+                  <ClipboardList className="w-2.5 h-2.5" />
+                  <span>+ ขั้นตอน</span>
+                </button>
+              ) : null}
 
               {/* Favorite / Bookmark Button */}
               <button

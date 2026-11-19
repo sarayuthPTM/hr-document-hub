@@ -13,9 +13,12 @@ import {
   CheckCircle2,
   AlertCircle,
   ShieldCheck,
-  Palette
+  Palette,
+  Copy,
+  Check
 } from 'lucide-react';
 import { CONFIG } from '../config/constants';
+import latestCodeGs from '../../google-apps-script/Code.gs?raw';
 
 export default function AdminSettingsModal({ 
   isOpen, 
@@ -44,6 +47,17 @@ export default function AdminSettingsModal({
   const [initResult, setInitResult] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+
+  const handleCopyCodeGs = async () => {
+    try {
+      await navigator.clipboard.writeText(latestCodeGs);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 3000);
+    } catch {
+      setTestResult({ success: false, message: 'ไม่สามารถคัดลอกอัตโนมัติได้ กรุณาคัดลอกจากไฟล์ google-apps-script/Code.gs' });
+    }
+  };
 
   // Sync latest settings from Google Sheet whenever modal opens
   useEffect(() => {
@@ -292,6 +306,37 @@ export default function AdminSettingsModal({
                 {isTesting ? 'ทดสอบ...' : 'ทดสอบ'}
               </button>
             </div>
+
+            {/* 1-Click Copy Code.gs for easy Apps Script upgrade */}
+            <div className="pt-2 border-t border-slate-200/80 dark:border-slate-700/80 flex flex-wrap items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setShowGuide(!showGuide)}
+                className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+              >
+                <Code2 className="w-3.5 h-3.5" />
+                <span>วิธีอัปเดตโค้ด Apps Script (รองรับหลายไฟล์ + ขั้นตอน)</span>
+                {showGuide ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCopyCodeGs}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-all active:scale-95"
+              >
+                {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedCode ? 'คัดลอกโค้ดแล้ว! ไปวางใน Apps Script ได้เลย' : 'คัดลอกโค้ด Code.gs ล่าสุด'}</span>
+              </button>
+            </div>
+
+            {showGuide && (
+              <ol className="text-[11px] text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 p-3 rounded-xl border border-indigo-200/70 dark:border-indigo-900/60 space-y-1 list-decimal list-inside leading-relaxed">
+                <li>กดปุ่ม <strong>"คัดลอกโค้ด Code.gs ล่าสุด"</strong> ด้านบน</li>
+                <li>เปิด Google Sheet ➔ เมนู <strong>ส่วนขยาย (Extensions)</strong> ➔ <strong>Apps Script</strong></li>
+                <li>ลบโค้ดเก่าทิ้งทั้งหมด แล้วกดวาง (<code>Ctrl+V</code>) ➔ กดบันทึก</li>
+                <li>กด <strong>การทำให้ใช้งานได้ (Deploy)</strong> ➔ <strong>จัดการการทำให้ใช้งานได้</strong> ➔ กดดินสอแก้ไข ➔ เลือก <strong>เวอร์ชันใหม่ (New version)</strong> ➔ กด <strong>Deploy</strong></li>
+              </ol>
+            )}
           </div>
 
           {/* Section 3: Admin PIN */}

@@ -73,8 +73,83 @@ class ApiService {
     return this.settings;
   }
 
-  // Load all documents + Sync live settings from Sheet
-  async getDocuments() {
+  /**
+   * Ultra-fast (~0.5s) read directly from public Google Sheet GViz endpoint (no GAS cold-start delay).
+   */
+  async fetchDocumentsFastFromSheet() {
+    if (!CONFIG.SHEET_ID) return null;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3500);
+    try {
+      const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:json&headers=1&sheet=${encodeURIComponent('ข้อมูล')}&_t=${Date.now()}`;
+      const res = await fetch(url, { signal: controller.signal });
+      if (!res.ok) return null;
+      const text = await res.text();
+      const startIdx = text.indexOf('{');
+      const endIdx = text.lastIndexOf('}');
+      if (startIdx === -1 || endIdx <= startIdx) return null;
+
+      const parsed = JSON.parse(text.slice(startIdx, endIdx + 1));
+      const cols = parsed?.table?.cols || [];
+      const rows = parsed?.table?.rows || [];
+      const headers = cols.map(c => String(c.label || c.id || '').trim());
+
+      const list = [];
+      for (const row of rows) {
+        const cells = row?.c || [];
+        const item = {};
+        headers.forEach((h, idx) => {
+          if (!h) return;
+          const cell = cells[idx];
+          if (!cell || cell.v === null || cell.v === undefined) {
+            item[h] = '';
+            return;
+          }
+          if (h === 'isPinned') {
+            item[h] = cell.v === true || String(cell.v).toUpperCase() === 'TRUE';
+          } else if (h === 'downloadCount' || h === 'viewCount') {
+            item[h] = Number(cell.v) || 0;
+          } else if (h === 'createdAt' || h === 'updatedAt') {
+            item[h] = cell.f || String(cell.v);
+          } else {
+            item[h] = cell.v;
+          }
+        });
+        if (!item.id && !item.title) continue;
+        list.push(item);
+      }
+
+      list.sort((a, b) => {
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+        return String(b.id).localeCompare(String(a.id));
+      });
+
+      const cleaned = this.cleanDocsList(list);
+      const normalized = cleaned.map(d => this.normalizeDoc(d));
+      const hasExtendedSchema = headers.includes('attachments') && headers.includes('steps');
+      return { data: normalized, hasExtendedSchema };
+    } catch (err) {
+      console.warn('Fast GViz fetch skipped:', err);
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // Load all documents + Sync live settings from Sheet (supports instant fast-callback before GAS settles)
+  async getDocuments(onFastData = null) {
+    let fastPromise = null;
+    if (typeof onFastData === 'function') {
+      fastPromise = this.fetchDocumentsFastFromSheet().then((fastRes) => {
+        if (fastRes && Array.isArray(fastRes.data)) {
+          localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(fastRes.data));
+          onFastData(fastRes.data, fastRes.hasExtendedSchema);
+        }
+        return fastRes;
+      });
+    }
+
     if (this.settings.gasUrl && this.settings.gasUrl.trim() !== '') {
       try {
         const url = new URL(this.settings.gasUrl.trim());
@@ -109,7 +184,14 @@ class ApiService {
           }
         }
       } catch (err) {
-        console.warn('Live GAS fetch failed, falling back to local storage:', err);
+        console.warn('Live GAS fetch failed, checking fast sheet or local storage:', err);
+      }
+    }
+
+    if (fastPromise) {
+      const fastRes = await fastPromise;
+      if (fastRes && Array.isArray(fastRes.data)) {
+        return { data: fastRes.data, settings: this.settings, isLive: true, message: 'ดึงข้อมูลด่วนจาก Google Sheet สำเร็จ' };
       }
     }
 

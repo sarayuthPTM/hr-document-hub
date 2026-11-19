@@ -49,10 +49,10 @@ export default function App() {
   // Settings & Status
   const [settings, setSettings] = useState(() => apiService.loadSettings());
   const [isLive, setIsLive] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
 
-  // Documents
-  const [documents, setDocuments] = useState([]);
+  // Documents (instant 0ms hydration from localStorage cache, then live-revalidated)
+  const [documents, setDocuments] = useState(() => apiService.getLocalDocuments());
+  const [isLoading, setIsLoading] = useState(true);
 
   // Favorites (Bookmark feature)
   const [favorites, setFavorites] = useState(() => {
@@ -98,15 +98,25 @@ export default function App() {
     localStorage.setItem(CONFIG.STORAGE_KEY_THEME, darkMode.toString());
   }, [darkMode]);
 
-  // Load documents on mount
+  // Load documents on mount (instant cache -> 0.5s GViz -> full GAS sync)
   useEffect(() => {
-    loadDocs();
+    loadDocs(true);
   }, []);
 
-  const loadDocs = async () => {
+  const loadDocs = async (useFastCache = true) => {
     setIsLoading(true);
     try {
-      const res = await apiService.getDocuments();
+      const onFastData = useFastCache
+        ? (fastDocs) => {
+            if (Array.isArray(fastDocs)) {
+              setDocuments(fastDocs);
+              setIsLive(true);
+              setIsLoading(false);
+            }
+          }
+        : null;
+
+      const res = await apiService.getDocuments(onFastData);
       setDocuments(res.data);
       if (res.settings) {
         setSettings(prev => ({ ...prev, ...res.settings }));
@@ -198,12 +208,16 @@ export default function App() {
     }
 
     const expectedCount = savedRes?.document?.attachments?.length || 0;
-    const freshDocs = await loadDocs();
+    const expectedSteps = (formData.steps || '').trim();
+    const freshDocs = await loadDocs(false);
     const savedId = savedRes?.document?.id;
     const fetchedDoc = Array.isArray(freshDocs) && savedId ? freshDocs.find(d => d.id === savedId) : null;
 
-    if (savedRes?.isLive && expectedCount > 1 && fetchedDoc && (!Array.isArray(fetchedDoc.attachments) || fetchedDoc.attachments.length < expectedCount)) {
-      showToast('อัปโหลดไฟล์แล้ว แต่ Google Apps Script บน Sheet ยังเป็นเวอร์ชันเดิม (ยังเก็บได้ไฟล์เดียว) กรุณาอัปเดต Code.gs และ Deploy New version ใน Apps Script', 'error');
+    const missingAttachments = expectedCount > 1 && (!Array.isArray(fetchedDoc?.attachments) || fetchedDoc.attachments.length < expectedCount);
+    const missingSteps = Boolean(expectedSteps) && (!fetchedDoc?.steps || String(fetchedDoc.steps).trim() === '');
+
+    if (savedRes?.isLive && fetchedDoc && (missingAttachments || missingSteps)) {
+      showToast('บันทึกหน้าเว็บแล้ว แต่ Google Apps Script บน Sheet ยังเป็นเวอร์ชันเดิม (ยังไม่มีคอลัมน์ attachments/steps) กดปุ่มตั้งค่า (⚙) เพื่อคัดลอกโค้ด Code.gs ไป Deploy ใหม่ครับ', 'error');
       return;
     }
 
@@ -494,7 +508,7 @@ export default function App() {
 
                 {/* Refresh Button */}
                 <button
-                  onClick={loadDocs}
+                  onClick={() => loadDocs(true)}
                   disabled={isLoading}
                   className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors"
                   title="รีเฟรชข้อมูล"
@@ -550,6 +564,7 @@ export default function App() {
             {viewMode === 'table' ? (
               <DocumentTable
                 documents={filteredDocuments}
+                isLoading={isLoading}
                 isAdmin={isAdmin}
                 onPreview={handlePreview}
                 onDownload={handleDownload}
@@ -563,6 +578,7 @@ export default function App() {
             ) : (
               <DocumentGrid
                 documents={filteredDocuments}
+                isLoading={isLoading}
                 isAdmin={isAdmin}
                 onPreview={handlePreview}
                 onDownload={handleDownload}
