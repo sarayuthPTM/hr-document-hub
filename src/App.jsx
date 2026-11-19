@@ -82,6 +82,7 @@ export default function App() {
   const [previewInitialIndex, setPreviewInitialIndex] = useState(0);
   const [downloadPickerDoc, setDownloadPickerDoc] = useState(null);
   const [stepsDoc, setStepsDoc] = useState(null);
+  const [stepsInitialTab, setStepsInitialTab] = useState(null);
   const [qrDoc, setQrDoc] = useState(null);
 
   // Toast
@@ -568,7 +569,10 @@ export default function App() {
                 isAdmin={isAdmin}
                 onPreview={handlePreview}
                 onDownload={handleDownload}
-                onOpenSteps={(doc) => setStepsDoc(doc)}
+                onOpenSteps={(doc, tab = null) => {
+                  setStepsDoc(doc);
+                  setStepsInitialTab(tab);
+                }}
                 onOpenQR={(doc) => setQrDoc(doc)}
                 onCopyLink={handleCopyLink}
                 onEdit={handleOpenEdit}
@@ -582,7 +586,10 @@ export default function App() {
                 isAdmin={isAdmin}
                 onPreview={handlePreview}
                 onDownload={handleDownload}
-                onOpenSteps={(doc) => setStepsDoc(doc)}
+                onOpenSteps={(doc, tab = null) => {
+                  setStepsDoc(doc);
+                  setStepsInitialTab(tab);
+                }}
                 onOpenQR={(doc) => setQrDoc(doc)}
                 onCopyLink={handleCopyLink}
                 onEdit={handleOpenEdit}
@@ -660,7 +667,11 @@ export default function App() {
 
       <StepsModal
         document={stepsDoc}
-        onClose={() => setStepsDoc(null)}
+        initialTab={stepsInitialTab}
+        onClose={() => {
+          setStepsDoc(null);
+          setStepsInitialTab(null);
+        }}
         onPreview={handlePreview}
         onDownload={handleDownload}
       />

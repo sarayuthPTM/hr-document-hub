@@ -617,16 +617,16 @@ export default function AdminAddEditModal({
             </div>
           </div>
 
-          {/* Description / Required Preparation Checklist */}
+          {/* Description / Required Preparation Details */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              คำอธิบาย / เอกสารที่ต้องเตรียมตอนยื่น (กดอ่านแบบ Checklist ได้)
+              คำอธิบาย / เอกสารที่ต้องเตรียมตอนยื่น
             </label>
             <textarea
               rows={3}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder={'เช่น รูปถ่ายขนาด 1 นิ้ว 2 รูป\nสำเนาบัตรประชาชน\nสำเนาทะเบียนบ้าน\n(พิมพ์ขึ้นบรรทัดใหม่ทีละข้อ ระบบจะทำเป็น Checklist ให้คุณครูกดเช็กได้อัตโนมัติ)'}
+              placeholder={'เช่น รูปถ่ายขนาด 1 นิ้ว 2 รูป\nสำเนาบัตรประชาชน\nสำเนาทะเบียนบ้าน\n(สามารถพิมพ์ขึ้นบรรทัดใหม่เพื่อจัดเรียงให้อ่านง่าย)'}
               className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>

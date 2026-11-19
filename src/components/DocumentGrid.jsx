@@ -295,7 +295,7 @@ export default function DocumentGrid({
                   draggable={false}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (!hasDraggedScroll && onOpenSteps) onOpenSteps(doc);
+                    if (!hasDraggedScroll && onOpenSteps) onOpenSteps(doc, hasSteps ? 'steps' : 'prep');
                   }}
                   className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-sky-50 dark:bg-sky-950/70 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/80 border border-sky-200 dark:border-sky-800 shadow-2xs transition-colors whitespace-nowrap"
                   title="คลิกดูขั้นตอนการดำเนินการและเอกสารที่ต้องเตรียม"
@@ -355,12 +355,12 @@ export default function DocumentGrid({
             {doc.title}
           </h3>
 
-          {/* Description (clickable to view full checklist/details when clipped or has steps) */}
+          {/* Description (clickable to view full details/preparation when clipped or has steps) */}
           {hasDesc && (
             <div
-              onClick={showGuideBtn ? () => !hasDraggedScroll && onOpenSteps && onOpenSteps(doc) : undefined}
+              onClick={showGuideBtn ? () => !hasDraggedScroll && onOpenSteps && onOpenSteps(doc, 'prep') : undefined}
               className={`mb-2 ${showGuideBtn ? 'cursor-pointer group/desc' : ''}`}
-              title={showGuideBtn ? 'คลิกเพื่ออ่านรายละเอียดและเช็กลิสต์ทั้งหมด' : undefined}
+              title={showGuideBtn ? 'คลิกเพื่ออ่านรายละเอียดทั้งหมด' : undefined}
             >
               <p className={`text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed ${
                 showGuideBtn ? 'group-hover/desc:text-sky-700 dark:group-hover/desc:text-sky-300 transition-colors' : ''
