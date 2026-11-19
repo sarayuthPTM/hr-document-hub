@@ -46,14 +46,19 @@ export default function DocumentGrid({
   const [scrollLeft, setScrollLeft] = useState(0);
   const [hasDraggedScroll, setHasDraggedScroll] = useState(false);
 
-  // Drag & Drop handlers for reordering
+  // Drag & Drop handlers for reordering (Admin only)
   const handleDragStart = (e, index) => {
+    if (!isAdmin) {
+      e.preventDefault();
+      return;
+    }
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', index.toString());
   };
 
   const handleDragOver = (e, index) => {
+    if (!isAdmin) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     if (dragOverIndex !== index) {
@@ -67,6 +72,7 @@ export default function DocumentGrid({
   };
 
   const handleDrop = (e, targetIndex) => {
+    if (!isAdmin) return;
     e.preventDefault();
     if (draggedIndex === null || draggedIndex === targetIndex) {
       setDraggedIndex(null);
@@ -156,12 +162,14 @@ export default function DocumentGrid({
     return (
       <div
         key={doc.id}
-        draggable={true}
-        onDragStart={(e) => handleDragStart(e, idx)}
-        onDragOver={(e) => handleDragOver(e, idx)}
-        onDrop={(e) => handleDrop(e, idx)}
-        onDragEnd={handleDragEnd}
-        className={`group relative bg-white dark:bg-slate-900 rounded-2xl p-4 border transition-all duration-200 flex flex-col justify-between cursor-grab active:cursor-grabbing ${
+        draggable={isAdmin}
+        onDragStart={isAdmin ? (e) => handleDragStart(e, idx) : undefined}
+        onDragOver={isAdmin ? (e) => handleDragOver(e, idx) : undefined}
+        onDrop={isAdmin ? (e) => handleDrop(e, idx) : undefined}
+        onDragEnd={isAdmin ? handleDragEnd : undefined}
+        className={`group relative bg-white dark:bg-slate-900 rounded-2xl p-4 border transition-all duration-200 flex flex-col justify-between ${
+          isAdmin ? 'cursor-grab active:cursor-grabbing' : ''
+        } ${
           layoutMode === 'slider' ? 'w-[295px] flex-shrink-0 select-none' : 'w-full'
         } ${
           isBeingDragged 
@@ -178,13 +186,15 @@ export default function DocumentGrid({
           <div className="flex items-center justify-between gap-1 mb-2">
             <div className="flex items-center gap-1.5 flex-wrap">
               
-              {/* Drag Handle Icon */}
-              <div 
-                className="drag-handle p-1 -ml-1 text-slate-300 hover:text-teal-600 dark:text-slate-600 dark:hover:text-teal-400 cursor-grab active:cursor-grabbing transition-colors rounded"
-                title="คลิกค้างแล้วลากเพื่อสลับลำดับการ์ด (อยู่ก่อน/อยู่หลัง)"
-              >
-                <GripVertical className="w-3.5 h-3.5" />
-              </div>
+              {/* Drag Handle Icon (Admin only) */}
+              {isAdmin && (
+                <div 
+                  className="drag-handle p-1 -ml-1 text-slate-300 hover:text-teal-600 dark:text-slate-600 dark:hover:text-teal-400 cursor-grab active:cursor-grabbing transition-colors rounded"
+                  title="คลิกค้างแล้วลากเพื่อสลับลำดับการ์ด (อยู่ก่อน/อยู่หลัง)"
+                >
+                  <GripVertical className="w-3.5 h-3.5" />
+                </div>
+              )}
 
               {/* File Types (shows all attached types such as PDF & WORD) */}
               {fileTypes.map((ftype) => {
@@ -313,21 +323,21 @@ export default function DocumentGrid({
               <span>เปิดดู</span>
             </button>
 
-            {/* Download */}
+            {/* Download (opens DownloadPickerModal automatically when attachmentCount > 1) */}
             <button
               type="button"
               onClick={() => {
                 if (!hasDraggedScroll) onDownload(doc);
               }}
-              className="relative p-1.5 rounded-xl text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors"
+              className={`flex items-center justify-center gap-1 rounded-xl text-xs font-semibold transition-colors border ${
+                attachmentCount > 1
+                  ? 'px-2.5 py-1.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/80 border-indigo-200 dark:border-indigo-800'
+                  : 'p-1.5 text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'
+              }`}
               title={attachmentCount > 1 ? `เลือกดาวน์โหลด (${attachmentCount} ไฟล์)` : 'ดาวน์โหลดไฟล์'}
             >
-              <Download className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
-              {attachmentCount > 1 && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-indigo-600 text-white text-[9px] font-extrabold flex items-center justify-center shadow-xs">
-                  {attachmentCount}
-                </span>
-              )}
+              <Download className={`w-3.5 h-3.5 ${attachmentCount > 1 ? 'text-indigo-600 dark:text-indigo-400' : 'text-teal-600 dark:text-teal-400'}`} />
+              {attachmentCount > 1 && <span>เลือกโหลด ({attachmentCount})</span>}
             </button>
 
             {/* QR Code */}
@@ -388,32 +398,38 @@ export default function DocumentGrid({
 
   return (
     <div className="space-y-2 my-2">
-      {/* Drag & Reorder Instruction Hint */}
-      <div className="flex items-center justify-between text-xs text-slate-400 px-1 py-1">
-        <span className="flex items-center gap-1.5">
-          <GripVertical className="w-3.5 h-3.5 text-teal-600" />
-          <span>สามารถ<strong>คลิกค้างแล้วลากการ์ด</strong> เพื่อสลับลำดับก่อน-หลังได้ทันที 🔄</span>
-        </span>
+      {/* Drag & Reorder Instruction Hint (Admin only) & Slider Arrows */}
+      {(isAdmin || layoutMode === 'slider') && (
+        <div className="flex items-center justify-between text-xs text-slate-400 px-1 py-1">
+          {isAdmin ? (
+            <span className="flex items-center gap-1.5">
+              <GripVertical className="w-3.5 h-3.5 text-teal-600" />
+              <span>สำหรับแอดมิน: สามารถ<strong>คลิกค้างแล้วลากการ์ด</strong> เพื่อสลับลำดับก่อน-หลังได้ทันที 🔄</span>
+            </span>
+          ) : (
+            <span />
+          )}
 
-        {layoutMode === 'slider' && (
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => scrollSlider('left')}
-              className="p-1 rounded-lg bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 shadow-xs"
-              title="เลื่อนซ้าย"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => scrollSlider('right')}
-              className="p-1 rounded-lg bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 shadow-xs"
-              title="เลื่อนขวา"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-      </div>
+          {layoutMode === 'slider' && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => scrollSlider('left')}
+                className="p-1 rounded-lg bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 shadow-xs"
+                title="เลื่อนซ้าย"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => scrollSlider('right')}
+                className="p-1 rounded-lg bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 shadow-xs"
+                title="เลื่อนขวา"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Presentation Mode: Grid vs Slider */}
       {layoutMode === 'slider' ? (

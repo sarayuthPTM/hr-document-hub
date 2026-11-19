@@ -110,9 +110,11 @@ export default function App() {
         setSettings(prev => ({ ...prev, ...res.settings }));
       }
       setIsLive(res.isLive);
+      return res.data;
     } catch (err) {
       console.error(err);
       showToast('แสดงข้อมูลจากแคชในเครื่อง', 'info');
+      return null;
     } finally {
       setIsLoading(false);
     }
@@ -122,8 +124,9 @@ export default function App() {
     setToast({ message, type });
   };
 
-  // Reorder documents (Drag & Drop)
+  // Reorder documents (Drag & Drop - Admin only)
   const handleReorderDocs = (fromIndex, toIndex) => {
+    if (!isAdmin) return;
     const docToMove = filteredDocuments[fromIndex];
     if (!docToMove) return;
 
@@ -184,19 +187,25 @@ export default function App() {
   };
 
   const handleSaveDoc = async (formData, newFiles = [], existingFiles = []) => {
-    if (editingDoc) {
-      await apiService.updateDocument({
-        ...editingDoc,
-        ...formData
-      }, newFiles, existingFiles);
-      showToast('บันทึกและอัปเดตเอกสารเรียบร้อย', 'success');
-      loadDocs();
-    } else {
-      await apiService.addDocument(formData, newFiles);
+    const savedRes = editingDoc
+      ? await apiService.updateDocument({ ...editingDoc, ...formData }, newFiles, existingFiles)
+      : await apiService.addDocument(formData, newFiles);
+
+    if (!editingDoc) {
       confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
-      showToast('เพิ่มเอกสารและอัปโหลดไฟล์สำเร็จ', 'success');
-      loadDocs();
     }
+
+    const expectedCount = savedRes?.document?.attachments?.length || 0;
+    const freshDocs = await loadDocs();
+    const savedId = savedRes?.document?.id;
+    const fetchedDoc = Array.isArray(freshDocs) && savedId ? freshDocs.find(d => d.id === savedId) : null;
+
+    if (savedRes?.isLive && expectedCount > 1 && fetchedDoc && (!Array.isArray(fetchedDoc.attachments) || fetchedDoc.attachments.length < expectedCount)) {
+      showToast('อัปโหลดไฟล์แล้ว แต่ Google Apps Script บน Sheet ยังเป็นเวอร์ชันเดิม (ยังเก็บได้ไฟล์เดียว) กรุณาอัปเดต Code.gs และ Deploy New version ใน Apps Script', 'error');
+      return;
+    }
+
+    showToast(editingDoc ? 'บันทึกและอัปเดตเอกสารเรียบร้อย' : 'เพิ่มเอกสารและอัปโหลดไฟล์สำเร็จ', 'success');
   };
 
   const handleDeleteDoc = async (doc) => {
@@ -472,7 +481,7 @@ export default function App() {
                     onChange={(e) => setSortBy(e.target.value)}
                     className="appearance-none pl-2.5 pr-7 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-medium cursor-pointer"
                   >
-                    <option value="custom">ลำดับตามที่ลากสลับ 🔄</option>
+                    <option value="custom">{isAdmin ? 'ลำดับตามที่ลากสลับ 🔄' : 'ลำดับค่าเริ่มต้น'}</option>
                     <option value="pinned">แนะนำ / ปักหมุด</option>
                     <option value="newest">เอกสารล่าสุด</option>
                     <option value="downloads">ยอดดาวน์โหลดสูงสุด</option>
