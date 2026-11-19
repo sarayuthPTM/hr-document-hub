@@ -387,9 +387,9 @@ export default function DocumentGrid({
               onClick={() => {
                 if (!hasDraggedScroll) onPreview(doc);
               }}
-              className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl text-xs font-semibold bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/80 border border-teal-200/80 dark:border-teal-800 transition-colors"
+              className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl text-xs font-semibold bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/80 border border-teal-200/80 dark:border-teal-800 transition-colors whitespace-nowrap"
             >
-              <Eye className="w-3 h-3" />
+              <Eye className="w-3 h-3 flex-shrink-0" />
               <span>เปิดดู</span>
             </button>
 
@@ -399,15 +399,10 @@ export default function DocumentGrid({
               onClick={() => {
                 if (!hasDraggedScroll) onDownload(doc);
               }}
-              className={`flex items-center justify-center gap-1 rounded-xl text-xs font-semibold transition-colors border ${
-                attachmentCount > 1
-                  ? 'px-2.5 py-1.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/80 border-indigo-200 dark:border-indigo-800'
-                  : 'p-1.5 text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'
-              }`}
+              className="p-1.5 rounded-xl text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors flex-shrink-0"
               title={attachmentCount > 1 ? `เลือกดาวน์โหลด (${attachmentCount} ไฟล์)` : 'ดาวน์โหลดไฟล์'}
             >
-              <Download className={`w-3.5 h-3.5 ${attachmentCount > 1 ? 'text-indigo-600 dark:text-indigo-400' : 'text-teal-600 dark:text-teal-400'}`} />
-              {attachmentCount > 1 && <span>เลือกโหลด ({attachmentCount})</span>}
+              <Download className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
             </button>
 
             {/* QR Code */}
