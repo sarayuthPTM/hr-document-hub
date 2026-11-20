@@ -34,7 +34,8 @@ function resolveDriveId(file) {
 }
 
 /**
- * Fetch PDF bytes directly from Google Drive CDN, Google Docs/Slides export-to-PDF, or direct/blob PDF URL.
+ * Fetch PDF bytes cleanly via same-origin Vercel API proxy (/api/pdf) first (eliminating Drive CORS blocks),
+ * then fall back to direct Google Drive CDN / Google Docs PDF export / direct URL.
  */
 async function fetchPdfArrayBuffer(file, signal) {
   const driveId = resolveDriveId(file);
@@ -46,7 +47,20 @@ async function fetchPdfArrayBuffer(file, signal) {
   const isDocsDoc = rawUrl.includes('docs.google.com/document/d/') || fileType === 'DOCX';
   const isDocsSlides = rawUrl.includes('docs.google.com/presentation/d/') || fileType === 'PPTX';
   const isDocsSheets = rawUrl.includes('docs.google.com/spreadsheets/d/') || fileType === 'XLSX';
+  const docKind = isDocsSlides ? 'presentation' : isDocsSheets ? 'spreadsheet' : 'document';
+  const isDocsPreferred = Boolean(
+    driveId && (rawUrl.includes('docs.google.com/') || rawUrl.includes('rtpof=true'))
+  );
 
+  // 1. Primary: Same-origin proxy (/api/pdf) so browser never hits Google Drive CORS errors
+  if (driveId) {
+    const proxyMode = isDocsPreferred ? 'export' : 'raw';
+    candidateUrls.push(
+      `/api/pdf?id=${encodeURIComponent(driveId)}&mode=${proxyMode}&docKind=${docKind}`
+    );
+  }
+
+  // 2. Fallback direct URLs (used in local dev or if proxy rejects large PDFs >4.5MB)
   const exportUrls = [];
   if (driveId) {
     if (isDocsSlides) {
@@ -58,14 +72,14 @@ async function fetchPdfArrayBuffer(file, signal) {
     }
   }
 
-  // If link explicitly points to Google Docs/Slides/Sheets editor (or rtpof=true), try PDF export first
-  if (driveId && (rawUrl.includes('docs.google.com/') || rawUrl.includes('rtpof=true'))) {
+  if (isDocsPreferred) {
     candidateUrls.push(...exportUrls);
-    candidateUrls.push(`https://drive.usercontent.google.com/download?id=${driveId}&export=download`);
+    candidateUrls.push(`https://drive.usercontent.google.com/download?id=${driveId}&export=download&confirm=t`);
   } else if (driveId) {
-    // Standard Drive PDF upload: fetch raw bytes first, then fallback to Docs export if it was a .docx stored as PDF
-    candidateUrls.push(`https://drive.usercontent.google.com/download?id=${driveId}&export=download`);
-    candidateUrls.push(...exportUrls);
+    candidateUrls.push(`https://drive.usercontent.google.com/download?id=${driveId}&export=download&confirm=t`);
+    if (isDocsDoc || isDocsSlides || isDocsSheets) {
+      candidateUrls.push(...exportUrls);
+    }
   }
 
   if (dlRawUrl && !dlRawUrl.includes('drive.google.com/') && !dlRawUrl.includes('docs.google.com/')) {
@@ -77,7 +91,7 @@ async function fetchPdfArrayBuffer(file, signal) {
 
   for (const url of uniqueUrls) {
     try {
-      const res = await fetch(url, { signal });
+      const res = await fetch(url, { signal, credentials: 'omit' });
       if (!res.ok) {
         lastError = new Error(`HTTP ${res.status}`);
         continue;

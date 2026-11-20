@@ -18,7 +18,7 @@ import {
 import * as XLSX from 'xlsx';
 import { CATEGORIES, YEARS } from '../config/constants';
 
-export default function AnalyticsDashboard({ documents, onPreview, onDownload }) {
+export default function AnalyticsDashboard({ documents = [], onPreview, onDownload }) {
   const [selectedYear, setSelectedYear] = useState('ทั้งหมด');
   const [selectedCategory, setSelectedCategory] = useState('ทั้งหมด');
 
@@ -81,8 +81,12 @@ export default function AnalyticsDashboard({ documents, onPreview, onDownload })
   // Downloads by Academic Year Breakdown
   const yearStats = useMemo(() => {
     const map = {};
-    documents.forEach(doc => {
-      const yr = doc.academicYear || 'ไม่ระบุ';
+    (Array.isArray(documents) ? documents : []).forEach(doc => {
+      const rawYear = doc.academicYear;
+      const yr =
+        rawYear !== undefined && rawYear !== null && String(rawYear).trim() !== ''
+          ? String(rawYear).trim()
+          : 'ไม่ระบุ';
       if (!map[yr]) {
         map[yr] = { year: yr, downloads: 0, count: 0 };
       }
@@ -90,7 +94,9 @@ export default function AnalyticsDashboard({ documents, onPreview, onDownload })
       map[yr].count += 1;
     });
 
-    return Object.values(map).sort((a, b) => b.year.localeCompare(a.year));
+    return Object.values(map).sort((a, b) =>
+      String(b.year).localeCompare(String(a.year), 'th', { numeric: true })
+    );
   }, [documents]);
 
   // Downloads by Target Audience Breakdown

@@ -384,7 +384,7 @@ export default function App() {
         return (b.downloadCount || 0) - (a.downloadCount || 0);
       }
       if (sortBy === 'title') {
-        return (a.title || '').localeCompare(b.title || '', 'th');
+        return String(a.title || '').localeCompare(String(b.title || ''), 'th');
       }
       return 0;
     });
