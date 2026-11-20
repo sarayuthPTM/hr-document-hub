@@ -121,8 +121,9 @@ export default function PdfFlipbookViewer({ file, title, onSwitchToStandard }) {
   const [errorMessage, setErrorMessage] = useState('');
   const [numPages, setNumPages] = useState(0);
   const [renderedCount, setRenderedCount] = useState(0);
-  const [currentPage, setCurrentPage] = useState(0); // 0-indexed
+  const [currentPage, setCurrentPage] = useState(0); // 0-indexed into PageFlip pages
   const [orientation, setOrientation] = useState('landscape');
+  const [hasBlankInsideCover, setHasBlankInsideCover] = useState(false);
   const [bookSize, setBookSize] = useState({ width: 420, height: 594 });
   const [zoom, setZoom] = useState(1);
 
@@ -161,6 +162,7 @@ export default function PdfFlipbookViewer({ file, title, onSwitchToStandard }) {
       setNumPages(0);
       setRenderedCount(0);
       setCurrentPage(0);
+      setHasBlankInsideCover(false);
       setZoom(1);
 
       try {
@@ -217,16 +219,22 @@ export default function PdfFlipbookViewer({ file, title, onSwitchToStandard }) {
         flipHostEl.className = 'mx-auto shadow-2xl rounded-sm';
         stageHostRef.current.appendChild(flipHostEl);
 
-        // Build placeholder page DOM nodes up front so Flipbook opens immediately as 2-page spread on desktop
+        // On desktop (>=640px) with >=2 pages: Front cover sits alone first, then Spread 2 has [Blank Inside Cover | Page 2], then [3|4], [5|6]...
+        const useInsideCoverBlank = !isNarrow && total >= 2;
+        setHasBlankInsideCover(useInsideCoverBlank);
+
         const pageEls = [];
         const imgEls = [];
         const spinnerEls = [];
 
         for (let i = 1; i <= total; i++) {
-          const isLeftInSpread = !isNarrow && i % 2 === 1;
+          const isLeftInSpread = useInsideCoverBlank ? (i >= 2 && i % 2 === 1) : (!isNarrow && i % 2 === 1);
           const pageDiv = document.createElement('div');
           pageDiv.className =
             'bg-white relative overflow-hidden select-none border border-slate-200/90 shadow-inner';
+          if (i === 1 || i === total) {
+            pageDiv.dataset.density = 'hard';
+          }
 
           // Subtle spine gradient highlight along center binding edge
           const spineOverlay = document.createElement('div');
@@ -249,17 +257,31 @@ export default function PdfFlipbookViewer({ file, title, onSwitchToStandard }) {
           img.draggable = false;
           pageDiv.appendChild(img);
 
-          const pageFooter = document.createElement('span');
-          pageFooter.className =
-            'pointer-events-none absolute bottom-1.5 ' +
-            (isLeftInSpread ? 'left-2.5' : 'right-2.5') +
-            ' px-1.5 py-0.5 rounded bg-slate-900/55 text-white text-[9px] font-mono z-10';
-          pageFooter.textContent = `${i}`;
-          pageDiv.appendChild(pageFooter);
+          if (i > 1) {
+            const pageFooter = document.createElement('span');
+            pageFooter.className =
+              'pointer-events-none absolute bottom-1.5 ' +
+              (isLeftInSpread ? 'left-2.5' : 'right-2.5') +
+              ' px-1.5 py-0.5 rounded bg-slate-900/55 text-white text-[9px] font-mono z-10';
+            pageFooter.textContent = `${i}`;
+            pageDiv.appendChild(pageFooter);
+          }
 
           pageEls.push(pageDiv);
           imgEls.push(img);
           spinnerEls.push(loaderOverlay);
+
+          // Insert blank inside-cover page right after Front Cover so Page 2 ("คำนำ") opens opposite a clean blank left page
+          if (i === 1 && useInsideCoverBlank) {
+            const blankDiv = document.createElement('div');
+            blankDiv.className =
+              'bg-gradient-to-r from-slate-50 via-white to-white relative overflow-hidden select-none border border-slate-200/90 shadow-inner';
+            const blankSpineOverlay = document.createElement('div');
+            blankSpineOverlay.className =
+              'pointer-events-none absolute inset-y-0 right-0 w-7 opacity-40 z-10 bg-gradient-to-l from-slate-900/20 to-transparent';
+            blankDiv.appendChild(blankSpineOverlay);
+            pageEls.push(blankDiv);
+          }
         }
 
         // Render helper per page at sharp retina resolution for clean zooming
@@ -317,7 +339,7 @@ export default function PdfFlipbookViewer({ file, title, onSwitchToStandard }) {
           flippingTime: 650,
           usePortrait: isNarrow,
           autoSize: true,
-          showCover: false,
+          showCover: true,
           mobileScrollSupport: true,
           showPageCorners: true,
           clickEventForward: true
@@ -385,9 +407,13 @@ export default function PdfFlipbookViewer({ file, title, onSwitchToStandard }) {
       ? 0
       : orientation === 'portrait'
         ? numPages - 1
-        : numPages % 2 === 0
-          ? numPages - 2
-          : numPages - 1;
+        : hasBlankInsideCover
+          ? numPages % 2 === 0
+            ? numPages - 1
+            : numPages
+          : numPages % 2 === 0
+            ? numPages - 2
+            : numPages - 1;
   const isAtEnd = currentPage >= lastSpreadStart;
 
   const handlePrev = () => flipRef.current?.flipPrev();
@@ -401,6 +427,20 @@ export default function PdfFlipbookViewer({ file, title, onSwitchToStandard }) {
     if (numPages === 0) return '-';
     if (orientation === 'portrait') {
       return `หน้า ${currentPage + 1} / ${numPages}`;
+    }
+    if (hasBlankInsideCover) {
+      if (currentPage === 0) {
+        return `หน้าปก (1 / ${numPages})`;
+      }
+      if (currentPage === 1) {
+        return `ปกใน - หน้า 2 / ${numPages}`;
+      }
+      const leftPdf = currentPage;
+      const rightPdf = currentPage + 1 <= numPages ? currentPage + 1 : null;
+      return rightPdf ? `หน้า ${leftPdf}-${rightPdf} / ${numPages}` : `หน้า ${leftPdf} / ${numPages}`;
+    }
+    if (currentPage === 0) {
+      return `หน้าปก (1 / ${numPages})`;
     }
     const leftNum = currentPage + 1;
     const rightNum = currentPage + 2 <= numPages ? currentPage + 2 : null;
