@@ -151,8 +151,7 @@ export default function DocumentGrid({
                 <div className="h-5 w-14 rounded-lg bg-slate-200 dark:bg-slate-800" />
                 <div className="h-5 w-16 rounded-lg bg-slate-100 dark:bg-slate-800/80" />
               </div>
-              <div className="h-3 w-28 rounded bg-teal-100/70 dark:bg-teal-950/60" />
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 pt-0.5">
                 <div className="h-4 w-full rounded bg-slate-200 dark:bg-slate-800" />
                 <div className="h-4 w-3/4 rounded bg-slate-200 dark:bg-slate-800" />
               </div>
@@ -348,17 +347,12 @@ export default function DocumentGrid({
             </div>
           </div>
 
-          {/* Category */}
-          <div className="text-[11px] font-medium text-teal-600 dark:text-teal-400 mb-1 truncate">
-            {doc.category}
-          </div>
-
-          {/* Title */}
+          {/* Title (Primary clickable heading) */}
           <h3 
             onClick={() => {
               if (!hasDraggedScroll) onPreview(doc);
             }}
-            className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white line-clamp-2 mb-1.5 group-hover:text-teal-600 dark:group-hover:text-teal-400 cursor-pointer transition-colors leading-snug"
+            className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white line-clamp-2 mt-0.5 mb-1.5 group-hover:text-teal-600 dark:group-hover:text-teal-400 cursor-pointer transition-colors leading-snug"
             title={doc.title}
           >
             {doc.title}
