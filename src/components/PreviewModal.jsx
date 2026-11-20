@@ -9,9 +9,11 @@ import {
   FolderOpen,
   Info,
   FolderDown,
-  Loader2
+  Loader2,
+  BookOpen
 } from 'lucide-react';
 import { getFileTypeConfig } from '../utils/fileTypeConfig';
+import PdfFlipbookViewer from './PdfFlipbookViewer';
 
 export default function PreviewModal({
   document,
@@ -25,6 +27,7 @@ export default function PreviewModal({
   const [activeFileIndex, setActiveFileIndex] = useState(initialFileIndex || 0);
   const [isDownloadingOne, setIsDownloadingOne] = useState(false);
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+  const [viewMode, setViewMode] = useState('standard'); // 'ebook' | 'standard'
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -37,6 +40,23 @@ export default function PreviewModal({
   useEffect(() => {
     setActiveFileIndex(initialFileIndex || 0);
   }, [document, initialFileIndex]);
+
+  useEffect(() => {
+    if (!document) return;
+    const files = (document.attachments && Array.isArray(document.attachments) && document.attachments.length > 0)
+      ? document.attachments
+      : [{ type: document.fileType || 'FILE', url: document.fileUrl || '', previewUrl: document.previewUrl || '' }];
+    const active = files[activeFileIndex] || files[0] || {};
+    const urlStr = active.previewUrl || active.url || active.downloadUrl || '';
+    const isFolder = urlStr.includes('/folders/') || urlStr.includes('drive.google.com/drive/u/');
+    const isPdf = String(active.type || document.fileType || '').toUpperCase() === 'PDF' || /\.pdf(\?|$)/i.test(urlStr);
+
+    if (document.isEbook && isPdf && !isFolder) {
+      setViewMode('ebook');
+    } else {
+      setViewMode('standard');
+    }
+  }, [document, activeFileIndex]);
 
   if (!document) return null;
 
@@ -57,6 +77,8 @@ export default function PreviewModal({
   const rawUrl = currentFile.previewUrl || currentFile.url || currentFile.downloadUrl || '';
   const isDriveFolder = rawUrl.includes('/folders/') || rawUrl.includes('drive.google.com/drive/u/');
   const currentTypeConf = getFileTypeConfig(currentFile.type || document.fileType);
+  const isCurrentPdf = String(currentFile.type || document.fileType || '').toUpperCase() === 'PDF' || /\.pdf(\?|$)/i.test(rawUrl);
+  const canUseEbookMode = Boolean(document.isEbook) && isCurrentPdf && !isDriveFolder;
 
   const handleCopy = () => {
     onCopyLink(rawUrl);
@@ -142,6 +164,37 @@ export default function PreviewModal({
 
           {/* Header Action Buttons */}
           <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            {canUseEbookMode && (
+              <div className="flex items-center p-0.5 rounded-xl bg-slate-200/80 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 mr-1">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('ebook')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                    viewMode === 'ebook'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                  }`}
+                  title="อ่านแบบหนังสือพลิกหน้า E-book"
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">E-book</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('standard')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                    viewMode === 'standard'
+                      ? 'bg-white dark:bg-slate-700 text-teal-700 dark:text-teal-300 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                  }`}
+                  title="สลับดูแบบ PDF ปกติ (สะดวกสำหรับสั่งพิมพ์)"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">PDF ปกติ</span>
+                </button>
+              </div>
+            )}
+
             <button
               type="button"
               onClick={handleDownloadCurrent}
@@ -227,9 +280,11 @@ export default function PreviewModal({
           <div className="flex items-center gap-2 overflow-hidden truncate">
             <Info className="w-3.5 h-3.5 flex-shrink-0 text-teal-600 dark:text-teal-400" />
             <span className="truncate">
-              {isDriveFolder 
+              {isDriveFolder
                 ? 'เอกสารนี้อยู่ในโฟลเดอร์ Google Drive รวม สามารถกดปุ่มเปิดดูโฟลเดอร์ได้โดยตรง'
-                : 'หากตัวอย่างเอกสารไม่แสดงผล กรุณากดปุ่ม "เปิดแท็บใหม่" หรือ "ดาวน์โหลด" ที่มุมบนขวา'}
+                : viewMode === 'ebook' && canUseEbookMode
+                  ? 'โหมดหนังสือ E-book: คลิกหรือลากมุมหน้ากระดาษเพื่อพลิกหน้า (หากต้องการสั่งพิมพ์ กดปุ่ม "PDF ปกติ" หรือ "ดาวน์โหลด" มุมบนขวา)'
+                  : 'หากตัวอย่างเอกสารไม่แสดงผล กรุณากดปุ่ม "เปิดแท็บใหม่" หรือ "ดาวน์โหลด" ที่มุมบนขวา'}
             </span>
           </div>
           <a
@@ -245,8 +300,15 @@ export default function PreviewModal({
         {/* Viewer Body Area */}
         <div className="flex-1 bg-slate-100 dark:bg-slate-950 p-2 sm:p-4 overflow-hidden relative">
           
-          {/* Case 1: Embed File iframe (Only when valid embedUrl exists) */}
-          {embedUrl ? (
+          {/* Case 0: Interactive 3D E-book Flipbook Mode */}
+          {viewMode === 'ebook' && canUseEbookMode ? (
+            <PdfFlipbookViewer
+              key={`ebook-${currentFile.driveId || rawUrl}-${activeFileIndex}`}
+              file={currentFile}
+              title={currentFile.name || document.title}
+              onSwitchToStandard={() => setViewMode('standard')}
+            />
+          ) : embedUrl ? (
             <iframe
               key={`${currentFile.driveId || rawUrl}-${activeFileIndex}`}
               src={embedUrl}

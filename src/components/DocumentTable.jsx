@@ -10,7 +10,8 @@ import {
   Edit3, 
   Trash2, 
   ExternalLink,
-  ClipboardList
+  ClipboardList,
+  BookOpen
 } from 'lucide-react';
 import { getFileTypeConfig, getDocumentFileTypes } from '../utils/fileTypeConfig';
 
@@ -122,6 +123,12 @@ export default function DocumentTable({
                         {doc.attachments.length} ไฟล์
                       </span>
                     )}
+                    {doc.isEbook && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                        <BookOpen className="w-2.5 h-2.5" />
+                        E-book
+                      </span>
+                    )}
                   </div>
                 </td>
 
@@ -154,10 +161,14 @@ export default function DocumentTable({
                     )}
                     <button
                       onClick={() => onPreview(doc)}
-                      className="p-1.5 rounded-lg text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/40 transition-colors"
-                      title="เปิดดูตัวอย่างไฟล์"
+                      className={`p-1.5 rounded-lg transition-colors ${
+                        doc.isEbook
+                          ? 'text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40'
+                          : 'text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/40'
+                      }`}
+                      title={doc.isEbook ? 'อ่านแบบหนังสือ E-book 3D' : 'เปิดดูตัวอย่างไฟล์'}
                     >
-                      <Eye className="w-4 h-4" />
+                      {doc.isEbook ? <BookOpen className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                     <button
                       onClick={() => onDownload(doc)}

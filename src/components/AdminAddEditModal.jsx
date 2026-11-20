@@ -14,7 +14,8 @@ import {
   Trash2,
   Download,
   FolderOpen,
-  ClipboardList
+  ClipboardList,
+  BookOpen
 } from 'lucide-react';
 import { CATEGORIES, TARGET_AUDIENCES, YEARS } from '../config/constants';
 import { parseDocumentSteps } from './StepsModal';
@@ -51,7 +52,8 @@ export default function AdminAddEditModal({
     tags: '',
     description: '',
     steps: '',
-    isPinned: false
+    isPinned: false,
+    isEbook: false
   });
 
   useEffect(() => {
@@ -67,7 +69,8 @@ export default function AdminAddEditModal({
         tags: editingDoc.tags || '',
         description: editingDoc.description || '',
         steps: editingDoc.steps || '',
-        isPinned: Boolean(editingDoc.isPinned)
+        isPinned: Boolean(editingDoc.isPinned),
+        isEbook: Boolean(editingDoc.isEbook)
       });
 
       // ดึงรายการไฟล์ที่มีอยู่แล้วในระบบออกมาแสดง
@@ -101,7 +104,8 @@ export default function AdminAddEditModal({
         tags: '',
         description: '',
         steps: '',
-        isPinned: false
+        isPinned: false,
+        isEbook: false
       });
       setExistingFiles([]);
       setNewFiles([]);
@@ -666,6 +670,26 @@ export default function AdminAddEditModal({
                 </button>
               </div>
             </div>
+          </div>
+
+          {/* E-book Flipbook Mode Checkbox */}
+          <div className="p-3 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900/50 space-y-1">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="isEbook"
+                checked={formData.isEbook}
+                onChange={(e) => setFormData({ ...formData, isEbook: e.target.checked })}
+                className="w-4 h-4 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+              />
+              <label htmlFor="isEbook" className="text-xs font-bold text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5 cursor-pointer">
+                <BookOpen className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                <span>เปิดอ่านแบบ E-book พลิกหน้า 3D (สำหรับไฟล์ PDF)</span>
+              </label>
+            </div>
+            <p className="text-[11px] text-indigo-700/80 dark:text-indigo-300/80 pl-6 leading-relaxed">
+              เวลากดดูบนหน้าเว็บจะเปิดเป็นหนังสือพลิกหน้าสวยงาม (ปุ่มดาวน์โหลดยังคงโหลดเป็นไฟล์ PDF ปกติ)
+            </p>
           </div>
 
           {/* Pinned Checkbox */}

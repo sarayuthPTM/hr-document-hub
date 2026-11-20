@@ -15,7 +15,8 @@ import {
   Bookmark,
   GripVertical,
   FolderOpen,
-  ClipboardList
+  ClipboardList,
+  BookOpen
 } from 'lucide-react';
 import { getFileTypeConfig, getDocumentFileTypes } from '../utils/fileTypeConfig';
 
@@ -270,6 +271,14 @@ export default function DocumentGrid({
                 </span>
               )}
 
+              {/* E-book Badge */}
+              {doc.isEbook && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800">
+                  <BookOpen className="w-2.5 h-2.5" />
+                  E-book
+                </span>
+              )}
+
               {/* Pinned Badge */}
               {doc.isPinned && (
                 <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
@@ -405,16 +414,30 @@ export default function DocumentGrid({
 
           {/* Action Buttons */}
           <div className="flex items-center gap-1.5" draggable={false}>
-            {/* Preview */}
+            {/* Preview / Read E-book */}
             <button
               type="button"
               onClick={() => {
                 if (!hasDraggedScroll) onPreview(doc);
               }}
-              className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl text-xs font-semibold bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/80 border border-teal-200/80 dark:border-teal-800 transition-colors whitespace-nowrap"
+              className={`flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl text-xs font-semibold border transition-colors whitespace-nowrap ${
+                doc.isEbook
+                  ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/80 border-indigo-200/80 dark:border-indigo-800'
+                  : 'bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/80 border-teal-200/80 dark:border-teal-800'
+              }`}
+              title={doc.isEbook ? 'เปิดอ่านแบบหนังสือ E-book 3D' : 'เปิดดูตัวอย่างไฟล์'}
             >
-              <Eye className="w-3 h-3 flex-shrink-0" />
-              <span>เปิดดู</span>
+              {doc.isEbook ? (
+                <>
+                  <BookOpen className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span>อ่าน E-book</span>
+                </>
+              ) : (
+                <>
+                  <Eye className="w-3 h-3 flex-shrink-0" />
+                  <span>เปิดดู</span>
+                </>
+              )}
             </button>
 
             {/* Download (opens DownloadPickerModal automatically when attachmentCount > 1) */}

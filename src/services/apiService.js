@@ -15,6 +15,10 @@ class ApiService {
     this._queuedOrderSerialized = null;
     this._pendingOrderIds = null;
     this._isSavingOrder = false;
+    this._activeEbookSavePromise = null;
+    this._queuedEbookSerialized = null;
+    this._pendingEbookIds = null;
+    this._isSavingEbook = false;
   }
 
   // Filter out any mock/simulated documents
@@ -75,6 +79,109 @@ class ApiService {
     }
 
     return this.settings;
+  }
+
+  /**
+   * Parse set of document IDs enabled for 3D E-book Flipbook view.
+   */
+  getEbookIdsSet(rawValue = null) {
+    const source = this._pendingEbookIds !== null
+      ? this._pendingEbookIds
+      : (rawValue !== null && rawValue !== undefined ? rawValue : this.settings?.ebookDocIds);
+
+    if (Array.isArray(source)) {
+      return new Set(source.map(id => String(id)));
+    }
+    if (typeof source === 'string' && source.trim().startsWith('[')) {
+      try {
+        const parsed = JSON.parse(source);
+        if (Array.isArray(parsed)) {
+          return new Set(parsed.map(id => String(id)));
+        }
+      } catch {}
+    }
+    return new Set();
+  }
+
+  /**
+   * Persist whether a document opens in 3D E-book mode to both LocalStorage & Google Sheet ('ตั้งค่าระบบ').
+   */
+  async setDocumentEbook(docId, isEbook) {
+    if (!docId) return { success: false, synced: false };
+    const idStr = String(docId);
+    const currentSet = this.getEbookIdsSet();
+    if (isEbook) {
+      currentSet.add(idStr);
+    } else {
+      currentSet.delete(idStr);
+    }
+
+    const updatedArr = Array.from(currentSet);
+    const serialized = JSON.stringify(updatedArr);
+
+    this._pendingEbookIds = updatedArr;
+    this._queuedEbookSerialized = serialized;
+    this.settings = { ...this.settings, ebookDocIds: serialized };
+    localStorage.setItem(CONFIG.STORAGE_KEY_SETTINGS, JSON.stringify(this.settings));
+
+    // Keep cached docs synchronized immediately
+    try {
+      const saved = localStorage.getItem(CONFIG.STORAGE_KEY_DOCS);
+      if (saved) {
+        const list = JSON.parse(saved);
+        if (Array.isArray(list)) {
+          const syncedList = list.map(d => (d && String(d.id) === idStr ? { ...d, isEbook: Boolean(isEbook) } : d));
+          localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(syncedList));
+        }
+      }
+    } catch {}
+
+    const gasUrl = this.settings.gasUrl ? this.settings.gasUrl.trim() : '';
+    if (!gasUrl) {
+      this._isSavingEbook = false;
+      this._pendingEbookIds = null;
+      return { success: true, synced: false };
+    }
+
+    if (this._activeEbookSavePromise) {
+      return this._activeEbookSavePromise;
+    }
+
+    this._isSavingEbook = true;
+    this._activeEbookSavePromise = (async () => {
+      let lastResult = { success: true, synced: false };
+      try {
+        while (this._queuedEbookSerialized !== null) {
+          const payloadEbook = this._queuedEbookSerialized;
+          this._queuedEbookSerialized = null;
+          try {
+            const res = await fetch(gasUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({
+                action: 'updateSettings',
+                settings: { ebookDocIds: payloadEbook }
+              })
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+              throw new Error(data.error || data.message || `HTTP ${res.status}`);
+            }
+            lastResult = { success: true, synced: true };
+          } catch (err) {
+            console.error('Sync ebookDocIds failed:', err);
+            lastResult = { success: false, synced: false, error: err.message || String(err) };
+          }
+        }
+      } finally {
+        this._isSavingEbook = false;
+        this._pendingEbookIds = null;
+        this._activeEbookSavePromise = null;
+      }
+      return lastResult;
+    })();
+
+    return this._activeEbookSavePromise;
   }
 
   /**
@@ -264,13 +371,22 @@ class ApiService {
         list.push(item);
       }
 
-      if (fastSettings && typeof fastSettings === 'object' && !this._isSavingOrder) {
+      if (fastSettings && typeof fastSettings === 'object') {
+        const preservedOrder = this._isSavingOrder && this._pendingOrderIds
+          ? JSON.stringify(this._pendingOrderIds)
+          : undefined;
+        const preservedEbook = this._isSavingEbook && this._pendingEbookIds
+          ? JSON.stringify(this._pendingEbookIds)
+          : undefined;
         this.settings = { ...this.settings, ...fastSettings };
+        if (preservedOrder !== undefined) this.settings.customDocOrder = preservedOrder;
+        if (preservedEbook !== undefined) this.settings.ebookDocIds = preservedEbook;
         localStorage.setItem(CONFIG.STORAGE_KEY_SETTINGS, JSON.stringify(this.settings));
       }
 
+      const ebookSet = this.getEbookIdsSet(fastSettings?.ebookDocIds ?? this.settings?.ebookDocIds);
       const cleaned = this.cleanDocsList(list);
-      const normalized = cleaned.map(d => this.normalizeDoc(d));
+      const normalized = cleaned.map(d => this.normalizeDoc(d, ebookSet));
       const ordered = this.applyCustomOrder(normalized, fastSettings?.customDocOrder ?? this.settings?.customDocOrder);
       const hasExtendedSchema = headers.includes('attachments') && headers.includes('steps');
       return { data: ordered, hasExtendedSchema };
@@ -314,16 +430,23 @@ class ApiService {
               const preservedOrder = this._isSavingOrder && this._pendingOrderIds
                 ? JSON.stringify(this._pendingOrderIds)
                 : undefined;
+              const preservedEbook = this._isSavingEbook && this._pendingEbookIds
+                ? JSON.stringify(this._pendingEbookIds)
+                : undefined;
               this.settings = { ...this.settings, ...resJson.settings };
               if (preservedOrder !== undefined) {
                 this.settings.customDocOrder = preservedOrder;
+              }
+              if (preservedEbook !== undefined) {
+                this.settings.ebookDocIds = preservedEbook;
               }
               localStorage.setItem(CONFIG.STORAGE_KEY_SETTINGS, JSON.stringify(this.settings));
             }
 
             if (Array.isArray(resJson.data)) {
+              const ebookSet = this.getEbookIdsSet(this.settings.ebookDocIds);
               const cleaned = this.cleanDocsList(resJson.data);
-              const normalized = cleaned.map(d => this.normalizeDoc(d));
+              const normalized = cleaned.map(d => this.normalizeDoc(d, ebookSet));
               const ordered = this.applyCustomOrder(normalized, this.settings.customDocOrder);
               localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(ordered));
               return {
@@ -353,8 +476,9 @@ class ApiService {
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed)) {
+          const ebookSet = this.getEbookIdsSet(this.settings?.ebookDocIds);
           const cleaned = this.cleanDocsList(parsed);
-          const normalized = cleaned.map(d => this.normalizeDoc(d));
+          const normalized = cleaned.map(d => this.normalizeDoc(d, ebookSet));
           const ordered = this.applyCustomOrder(normalized, this.settings?.customDocOrder);
           localStorage.setItem(CONFIG.STORAGE_KEY_DOCS, JSON.stringify(ordered));
           return { data: ordered, settings: this.settings, isLive: false, message: 'แสดงข้อมูลจากความจำเครื่อง (ออฟไลน์)' };
@@ -368,8 +492,8 @@ class ApiService {
     return { data: [], settings: this.settings, isLive: false, message: 'ยังไม่มีเอกสารในระบบ' };
   }
 
-  // Normalize document to ensure attachments array always exists
-  normalizeDoc(doc) {
+  // Normalize document to ensure attachments array and isEbook flag always exist
+  normalizeDoc(doc, ebookSetOverride = null) {
     if (!doc) return doc;
     let attachments = doc.attachments;
     if (typeof attachments === 'string' && attachments.trim() !== '') {
@@ -408,8 +532,15 @@ class ApiService {
         };
       });
     }
+    const ebookSet = ebookSetOverride instanceof Set ? ebookSetOverride : this.getEbookIdsSet();
+    const hasExplicitEbook = doc.isEbook !== undefined && doc.isEbook !== '';
+    const resolvedEbook = hasExplicitEbook
+      ? (doc.isEbook === true || String(doc.isEbook).toUpperCase() === 'TRUE')
+      : ebookSet.has(String(doc.id));
+
     return {
       ...doc,
+      isEbook: resolvedEbook,
       steps: doc.steps !== undefined && doc.steps !== null ? String(doc.steps) : '',
       attachments
     };
@@ -556,8 +687,13 @@ class ApiService {
         throw new Error(result.error || result.message || 'ไม่สามารถบันทึกข้อมูลเอกสารลง Google Sheet ได้');
       }
 
+      if (docData.isEbook) {
+        await this.setDocumentEbook(result.document.id, true);
+      }
+
       const finalDoc = this.normalizeDoc({
         ...result.document,
+        isEbook: Boolean(docData.isEbook),
         fileType: payloadDoc.fileType || result.document.fileType,
         attachments: uploadedAttachments.length > 0 ? uploadedAttachments : result.document.attachments
       });
@@ -568,8 +704,13 @@ class ApiService {
     }
 
     // Local addition (Offline / No GAS URL configured)
+    const offlineId = 'DOC-' + Date.now();
+    if (docData.isEbook) {
+      await this.setDocumentEbook(offlineId, true);
+    }
+
     const newDoc = this.normalizeDoc({
-      id: 'DOC-' + Date.now(),
+      id: offlineId,
       title: payloadDoc.title || (filesArray[0] ? filesArray[0].name : 'เอกสารใหม่'),
       docNumber: payloadDoc.docNumber || '-',
       category: payloadDoc.category || 'แบบฟอร์มใบลาและขออนุญาต',
@@ -589,6 +730,7 @@ class ApiService {
       downloadCount: 0,
       viewCount: 0,
       isPinned: Boolean(payloadDoc.isPinned),
+      isEbook: Boolean(docData.isEbook),
       status: 'active',
       createdAt: new Date().toLocaleDateString('th-TH') + ' ' + new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
       updatedAt: new Date().toLocaleDateString('th-TH') + ' ' + new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
@@ -666,12 +808,19 @@ class ApiService {
         throw new Error(result.error || result.message || 'ไม่สามารถอัปเดตข้อมูลเอกสารใน Google Sheet ได้');
       }
 
+      if (docData.isEbook !== undefined) {
+        await this.setDocumentEbook(docData.id, Boolean(docData.isEbook));
+      }
+
       const finalDoc = this.normalizeDoc(updatedFields);
       this.updateLocalDocument(finalDoc);
       return { success: true, document: finalDoc, isLive: true };
     }
 
     // Local / Offline fallback update
+    if (docData.isEbook !== undefined) {
+      await this.setDocumentEbook(docData.id, Boolean(docData.isEbook));
+    }
     const updated = this.normalizeDoc({
       ...updatedFields,
       updatedAt: new Date().toLocaleDateString('th-TH') + ' ' + new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
@@ -701,10 +850,16 @@ class ApiService {
         throw new Error(result.error || result.message || 'ไม่สามารถลบเอกสารใน Google Sheet ได้');
       }
 
+      if (this.getEbookIdsSet().has(String(id))) {
+        this.setDocumentEbook(id, false).catch(() => {});
+      }
       this.deleteLocalDocument(id);
       return { success: true, isLive: true };
     }
 
+    if (this.getEbookIdsSet().has(String(id))) {
+      this.setDocumentEbook(id, false).catch(() => {});
+    }
     this.deleteLocalDocument(id);
     return { success: true, isLive: false };
   }
@@ -828,7 +983,8 @@ class ApiService {
       const saved = localStorage.getItem(CONFIG.STORAGE_KEY_DOCS);
       const list = saved ? JSON.parse(saved) : [];
       if (!Array.isArray(list)) return [];
-      const cleaned = this.cleanDocsList(list).map(d => this.normalizeDoc(d));
+      const ebookSet = this.getEbookIdsSet();
+      const cleaned = this.cleanDocsList(list).map(d => this.normalizeDoc(d, ebookSet));
       return this.applyCustomOrder(cleaned, this.settings?.customDocOrder);
     } catch {
       return [];
