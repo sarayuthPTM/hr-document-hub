@@ -195,6 +195,7 @@ export default function App() {
 
   const handleLogout = () => {
     setIsAdmin(false);
+    setActiveTab('documents');
     localStorage.removeItem(CONFIG.STORAGE_KEY_ADMIN_AUTH);
     showToast('ออกจากระบบแอดมินแล้ว', 'info');
   };
@@ -332,15 +333,14 @@ export default function App() {
   // Filtering & Sorting
   const filteredDocuments = useMemo(() => {
     return documents.filter(doc => {
-      // Search Query
+      // Search Query (searches document title, code, tags, description — not broad category names)
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
-        const matchTitle = (doc.title || '').toLowerCase().includes(q);
-        const matchDocNum = (doc.docNumber || '').toLowerCase().includes(q);
-        const matchTags = (doc.tags || '').toLowerCase().includes(q);
-        const matchDesc = (doc.description || '').toLowerCase().includes(q);
-        const matchCat = (doc.category || '').toLowerCase().includes(q);
-        if (!matchTitle && !matchDocNum && !matchTags && !matchDesc && !matchCat) {
+        const matchTitle = String(doc.title || '').toLowerCase().includes(q);
+        const matchDocNum = String(doc.docNumber || '').toLowerCase().includes(q);
+        const matchTags = String(doc.tags || '').toLowerCase().includes(q);
+        const matchDesc = String(doc.description || '').toLowerCase().includes(q);
+        if (!matchTitle && !matchDocNum && !matchTags && !matchDesc) {
           return false;
         }
       }
@@ -412,7 +412,7 @@ export default function App() {
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-4">
         
         {/* TAB 1: Documents Repository */}
-        {activeTab === 'documents' && (
+        {(activeTab === 'documents' || !isAdmin) && (
           <>
             {/* Sleek Compact Hero Banner & Search */}
             <HeroBanner
@@ -615,8 +615,8 @@ export default function App() {
           </>
         )}
 
-        {/* TAB 2: Dashboard Analytics */}
-        {activeTab === 'analytics' && (
+        {/* TAB 2: Dashboard Analytics (Admin only) */}
+        {isAdmin && activeTab === 'analytics' && (
           <AnalyticsDashboard
             documents={documents}
             onPreview={handlePreview}
