@@ -211,29 +211,30 @@ export default function PdfFlipbookViewer({ file, title, onSwitchToStandard }) {
 
         // Dedicated child host because PageFlip.destroy() detaches its root element
         const flipHostEl = document.createElement('div');
-        flipHostEl.className = 'mx-auto shadow-2xl';
+        const targetStageWidth = isNarrow ? singleW : singleW * 2;
+        flipHostEl.style.width = `${targetStageWidth}px`;
+        flipHostEl.style.height = `${singleH}px`;
+        flipHostEl.className = 'mx-auto shadow-2xl rounded-sm';
         stageHostRef.current.appendChild(flipHostEl);
 
-        // Build placeholder page DOM nodes up front so Flipbook opens as soon as cover renders
+        // Build placeholder page DOM nodes up front so Flipbook opens immediately as 2-page spread on desktop
         const pageEls = [];
         const imgEls = [];
         const spinnerEls = [];
 
         for (let i = 1; i <= total; i++) {
+          const isLeftInSpread = !isNarrow && i % 2 === 1;
           const pageDiv = document.createElement('div');
           pageDiv.className =
             'bg-white relative overflow-hidden select-none border border-slate-200/90 shadow-inner';
-          if (i === 1 || i === total) {
-            pageDiv.dataset.density = 'hard';
-          }
 
-          // Subtle spine gradient highlight along binding edge
+          // Subtle spine gradient highlight along center binding edge
           const spineOverlay = document.createElement('div');
           spineOverlay.className =
-            'pointer-events-none absolute inset-y-0 w-6 opacity-35 z-10 ' +
-            (i % 2 === 1
-              ? 'left-0 bg-gradient-to-r from-slate-900/20 to-transparent'
-              : 'right-0 bg-gradient-to-l from-slate-900/20 to-transparent');
+            'pointer-events-none absolute inset-y-0 w-7 opacity-40 z-10 ' +
+            (isLeftInSpread
+              ? 'right-0 bg-gradient-to-l from-slate-900/20 to-transparent'
+              : 'left-0 bg-gradient-to-r from-slate-900/20 to-transparent');
           pageDiv.appendChild(spineOverlay);
 
           const loaderOverlay = document.createElement('div');
@@ -251,7 +252,7 @@ export default function PdfFlipbookViewer({ file, title, onSwitchToStandard }) {
           const pageFooter = document.createElement('span');
           pageFooter.className =
             'pointer-events-none absolute bottom-1.5 ' +
-            (i % 2 === 0 ? 'left-2.5' : 'right-2.5') +
+            (isLeftInSpread ? 'left-2.5' : 'right-2.5') +
             ' px-1.5 py-0.5 rounded bg-slate-900/55 text-white text-[9px] font-mono z-10';
           pageFooter.textContent = `${i}`;
           pageDiv.appendChild(pageFooter);
@@ -295,8 +296,8 @@ export default function PdfFlipbookViewer({ file, title, onSwitchToStandard }) {
           setRenderedCount((prev) => Math.max(prev, pageNum));
         };
 
-        // Render cover + first spread before mounting PageFlip for crisp immediate reveal
-        const initialReadyCount = Math.min(total, 3);
+        // Render first 2 pages before mounting PageFlip so both open pages appear crisp immediately
+        const initialReadyCount = Math.min(total, isNarrow ? 1 : 2);
         for (let p = 1; p <= initialReadyCount; p++) {
           if (cancelled) return;
           await renderPageImage(p);
@@ -307,16 +308,16 @@ export default function PdfFlipbookViewer({ file, title, onSwitchToStandard }) {
           width: singleW,
           height: singleH,
           size: 'fixed',
-          minWidth: 220,
-          maxWidth: 1000,
-          minHeight: 280,
-          maxHeight: 1400,
+          minWidth: singleW,
+          maxWidth: singleW,
+          minHeight: singleH,
+          maxHeight: singleH,
           drawShadow: true,
           maxShadowOpacity: 0.45,
           flippingTime: 650,
-          usePortrait: true,
+          usePortrait: isNarrow,
           autoSize: true,
-          showCover: true,
+          showCover: false,
           mobileScrollSupport: true,
           showPageCorners: true,
           clickEventForward: true
@@ -379,16 +380,26 @@ export default function PdfFlipbookViewer({ file, title, onSwitchToStandard }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [status]);
 
+  const lastSpreadStart =
+    numPages === 0
+      ? 0
+      : orientation === 'portrait'
+        ? numPages - 1
+        : numPages % 2 === 0
+          ? numPages - 2
+          : numPages - 1;
+  const isAtEnd = currentPage >= lastSpreadStart;
+
   const handlePrev = () => flipRef.current?.flipPrev();
   const handleNext = () => flipRef.current?.flipNext();
   const handleFirst = () => flipRef.current?.flip(0);
   const handleLast = () => {
-    if (numPages > 0) flipRef.current?.flip(numPages - 1);
+    if (numPages > 0) flipRef.current?.flip(lastSpreadStart);
   };
 
   const pageLabel = (() => {
     if (numPages === 0) return '-';
-    if (orientation === 'portrait' || currentPage === 0) {
+    if (orientation === 'portrait') {
       return `หน้า ${currentPage + 1} / ${numPages}`;
     }
     const leftNum = currentPage + 1;
@@ -430,7 +441,7 @@ export default function PdfFlipbookViewer({ file, title, onSwitchToStandard }) {
               <div className="w-56 h-1.5 rounded-full bg-slate-700 overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-teal-400 to-indigo-400 transition-all duration-300"
-                  style={{ width: `${Math.min(100, Math.round((renderedCount / Math.min(numPages, 3)) * 100))}%` }}
+                  style={{ width: `${Math.min(100, Math.round((renderedCount / Math.min(numPages, 2)) * 100))}%` }}
                 />
               </div>
             )}
@@ -474,7 +485,7 @@ export default function PdfFlipbookViewer({ file, title, onSwitchToStandard }) {
         >
           <div
             ref={stageHostRef}
-            className="transition-transform duration-200 origin-center"
+            className="w-full flex items-center justify-center transition-transform duration-200 origin-center"
             style={{
               transform: zoom !== 1 ? `scale(${zoom})` : undefined
             }}
@@ -513,7 +524,7 @@ export default function PdfFlipbookViewer({ file, title, onSwitchToStandard }) {
           <button
             type="button"
             onClick={handleNext}
-            disabled={status !== 'ready' || currentPage >= numPages - 1}
+            disabled={status !== 'ready' || isAtEnd}
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-35 disabled:pointer-events-none font-semibold transition-colors"
             title="พลิกหน้าถัดไป (ลูกศรขวา)"
           >
@@ -523,7 +534,7 @@ export default function PdfFlipbookViewer({ file, title, onSwitchToStandard }) {
           <button
             type="button"
             onClick={handleLast}
-            disabled={status !== 'ready' || currentPage >= numPages - 1}
+            disabled={status !== 'ready' || isAtEnd}
             className="p-1.5 rounded-lg hover:bg-slate-800 disabled:opacity-35 disabled:pointer-events-none transition-colors"
             title="หน้าสุดท้าย"
           >
