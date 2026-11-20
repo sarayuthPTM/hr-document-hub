@@ -49,9 +49,10 @@ export default function PreviewModal({
     const active = files[activeFileIndex] || files[0] || {};
     const urlStr = active.previewUrl || active.url || active.downloadUrl || '';
     const isFolder = urlStr.includes('/folders/') || urlStr.includes('drive.google.com/drive/u/');
-    const isPdf = String(active.type || document.fileType || '').toUpperCase() === 'PDF' || /\.pdf(\?|$)/i.test(urlStr);
+    const typeUpper = String(active.type || document.fileType || '').toUpperCase();
+    const isEbookType = ['PDF', 'DOCX', 'PPTX'].includes(typeUpper) || /\.pdf(\?|$)/i.test(urlStr) || urlStr.includes('docs.google.com/');
 
-    if (document.isEbook && isPdf && !isFolder) {
+    if (document.isEbook && isEbookType && !isFolder) {
       setViewMode('ebook');
     } else {
       setViewMode('standard');
@@ -77,8 +78,9 @@ export default function PreviewModal({
   const rawUrl = currentFile.previewUrl || currentFile.url || currentFile.downloadUrl || '';
   const isDriveFolder = rawUrl.includes('/folders/') || rawUrl.includes('drive.google.com/drive/u/');
   const currentTypeConf = getFileTypeConfig(currentFile.type || document.fileType);
-  const isCurrentPdf = String(currentFile.type || document.fileType || '').toUpperCase() === 'PDF' || /\.pdf(\?|$)/i.test(rawUrl);
-  const canUseEbookMode = Boolean(document.isEbook) && isCurrentPdf && !isDriveFolder;
+  const currentTypeUpper = String(currentFile.type || document.fileType || '').toUpperCase();
+  const isEbookSupported = ['PDF', 'DOCX', 'PPTX'].includes(currentTypeUpper) || /\.pdf(\?|$)/i.test(rawUrl) || rawUrl.includes('docs.google.com/');
+  const canUseEbookMode = Boolean(document.isEbook) && isEbookSupported && !isDriveFolder;
 
   const handleCopy = () => {
     onCopyLink(rawUrl);

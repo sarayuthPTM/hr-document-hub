@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PageFlip } from 'page-flip';
-import * as pdfjsLib from 'pdfjs-dist/build/pdf.mjs';
-import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import {
   BookOpen,
   ChevronLeft,
@@ -34,22 +34,48 @@ function resolveDriveId(file) {
 }
 
 /**
- * Fetch PDF bytes directly from Google Drive CDN or direct/blob PDF URL.
+ * Fetch PDF bytes directly from Google Drive CDN, Google Docs/Slides export-to-PDF, or direct/blob PDF URL.
  */
 async function fetchPdfArrayBuffer(file, signal) {
   const driveId = resolveDriveId(file);
-  const rawUrl = file?.downloadUrl || file?.url || file?.previewUrl || '';
+  const rawUrl = file?.previewUrl || file?.url || file?.downloadUrl || '';
+  const dlRawUrl = file?.downloadUrl || file?.url || '';
+  const fileType = String(file?.type || '').toUpperCase();
 
   const candidateUrls = [];
+  const isDocsDoc = rawUrl.includes('docs.google.com/document/d/') || fileType === 'DOCX';
+  const isDocsSlides = rawUrl.includes('docs.google.com/presentation/d/') || fileType === 'PPTX';
+  const isDocsSheets = rawUrl.includes('docs.google.com/spreadsheets/d/') || fileType === 'XLSX';
+
+  const exportUrls = [];
   if (driveId) {
-    candidateUrls.push(`https://drive.usercontent.google.com/download?id=${driveId}&export=download`);
-  }
-  if (rawUrl && !rawUrl.includes('drive.google.com/file/d/')) {
-    candidateUrls.push(rawUrl);
+    if (isDocsSlides) {
+      exportUrls.push(`https://docs.google.com/presentation/d/${driveId}/export/pdf`);
+    } else if (isDocsSheets) {
+      exportUrls.push(`https://docs.google.com/spreadsheets/d/${driveId}/export?format=pdf`);
+    } else {
+      exportUrls.push(`https://docs.google.com/document/d/${driveId}/export?format=pdf`);
+    }
   }
 
+  // If link explicitly points to Google Docs/Slides/Sheets editor (or rtpof=true), try PDF export first
+  if (driveId && (rawUrl.includes('docs.google.com/') || rawUrl.includes('rtpof=true'))) {
+    candidateUrls.push(...exportUrls);
+    candidateUrls.push(`https://drive.usercontent.google.com/download?id=${driveId}&export=download`);
+  } else if (driveId) {
+    // Standard Drive PDF upload: fetch raw bytes first, then fallback to Docs export if it was a .docx stored as PDF
+    candidateUrls.push(`https://drive.usercontent.google.com/download?id=${driveId}&export=download`);
+    candidateUrls.push(...exportUrls);
+  }
+
+  if (dlRawUrl && !dlRawUrl.includes('drive.google.com/') && !dlRawUrl.includes('docs.google.com/')) {
+    candidateUrls.push(dlRawUrl);
+  }
+
+  const uniqueUrls = [...new Set(candidateUrls)];
   let lastError = null;
-  for (const url of candidateUrls) {
+
+  for (const url of uniqueUrls) {
     try {
       const res = await fetch(url, { signal });
       if (!res.ok) {
@@ -101,7 +127,18 @@ export default function PdfFlipbookViewer({ file, title, onSwitchToStandard }) {
   useEffect(() => {
     let cancelled = false;
     const abortController = new AbortController();
+    let activeLoadingTask = null;
     let activePdfDoc = null;
+
+    const cleanupPdf = () => {
+      try {
+        if (typeof activeLoadingTask?.destroy === 'function') {
+          activeLoadingTask.destroy().catch(() => {});
+        } else if (typeof activePdfDoc?.cleanup === 'function') {
+          activePdfDoc.cleanup();
+        }
+      } catch {}
+    };
 
     const initEbook = async () => {
       destroyFlipbook();
@@ -117,10 +154,11 @@ export default function PdfFlipbookViewer({ file, title, onSwitchToStandard }) {
         if (cancelled) return;
 
         const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(pdfBytes) });
+        activeLoadingTask = loadingTask;
         const pdfDoc = await loadingTask.promise;
         activePdfDoc = pdfDoc;
         if (cancelled) {
-          pdfDoc.destroy().catch(() => {});
+          cleanupPdf();
           return;
         }
 
@@ -309,9 +347,7 @@ export default function PdfFlipbookViewer({ file, title, onSwitchToStandard }) {
       cancelled = true;
       abortController.abort();
       destroyFlipbook();
-      if (activePdfDoc) {
-        activePdfDoc.destroy().catch(() => {});
-      }
+      cleanupPdf();
     };
   }, [file, title, destroyFlipbook]);
 
